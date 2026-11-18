@@ -51,12 +51,13 @@ Requirements this convention places on the repo settings (set up in #11):
 
 - The PR title check is a required status check on `main`, with no admin bypass.
 - The title workflow also runs on the `edited` PR event, so fixing a title re-runs the check.
-- Squash-merge only, with the default commit message set to "PR title + PR body". The commit on `main` is then the one CI validated.
+- Squash-merge only, with the default commit message set to "Pull request title". GitHub appends `(#N)`, so the commit on `main` is exactly the title CI validated and links back to the PR.
 
 ### Branches, issues, and PRs
 
 - **Branch names:** `<github-user>/<slug>`, for example `robkeim/commit-and-pr-conventions`. Convention only; not enforced, since the name is gone after the squash.
-- **Issue links:** put `Closes #N` in the PR body. Commit footers need no issue reference, because the squash commit carries the PR body.
+- **Issue links:** put `Closes #N` in the PR body. Commit footers need no issue reference; the `(#N)` suffix links the commit to the PR.
+- **Keeping history:** the PR body stays on GitHub, reachable from the `(#N)` link. Put lasting rationale in an ADR or the relevant doc, not only the PR body, and edit the squash message at merge time when a change needs commit-level context.
 - **PR template:** `.github/pull_request_template.md` has Summary, Linked issue, Test plan, and Tradeoffs to check.
 - **Issue templates:** `.github/ISSUE_TEMPLATE/` has bug and feature forms that apply `needs-triage`. Blank issues stay enabled for wayfinder tickets.
 - **Changelog and releases:** none for now. The commit history keeps that option open.
