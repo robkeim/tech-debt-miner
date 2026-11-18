@@ -1,3 +1,7 @@
+## Working agreement
+
+Rules for commits, PRs, the gate, and docs live in `CONTRIBUTING.md`. Follow it; this file only configures agent skills.
+
 ## Agent skills
 
 ### Issue tracker
