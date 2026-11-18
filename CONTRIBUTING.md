@@ -22,7 +22,12 @@ Write an ADR only when a decision is hard to reverse, surprising without context
 
 ## Docs check
 
-A step in the gate verifies that relative links between docs resolve. There is no Markdown style linter. Spelling is covered by the prose checks (#6).
+The gate runs two prose checks. Both report only; neither can autofix.
+
+- **Spelling:** `cspell` with the `en-US` dictionary, a `flagWords` list of British spellings, and one alphabetized project words list. It covers Python source, Markdown, YAML and TOML config, and commit messages. Add a word to the list in the PR that needs it; use inline `cspell:disable` only for one-offs like hashes.
+- **Links:** `lychee --offline --include-fragments` verifies that relative links and heading anchors in docs resolve. External URLs are not checked.
+
+There is no Markdown style linter. The local hook runs `cspell` on staged files; the gate and CI run both checks in full.
 
 ## Commits and PRs
 
