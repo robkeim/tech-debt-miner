@@ -3,21 +3,23 @@ description: Something is broken or behaves unexpectedly.
 labels: ["needs-triage"]
 body:
   - type: textarea
-    id: what-happened
+    id: repro
     attributes:
-      label: What happened
-      description: Include the command you ran and the exact error or output.
+      label: Repro test
+      description: A failing test or the smallest command that shows the bug.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happens, with the exact error or output.
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
       label: Expected behavior
-    validations:
-      required: true
-  - type: textarea
-    id: repro
-    attributes:
-      label: Steps to reproduce
     validations:
       required: true
