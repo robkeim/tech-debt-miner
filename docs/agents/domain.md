@@ -12,31 +12,18 @@ If any of these files don't exist, **proceed silently**. Don't flag their absenc
 
 ## File structure
 
-Single-context repo (most repos):
+This repo is single-context. Layout (the ADR file names are placeholders, not real decisions):
 
 ```
 /
 ├── GLOSSARY.md
 ├── docs/adr/
-│   ├── 0001-event-sourced-orders.md
-│   └── 0002-postgres-for-write-model.md
+│   ├── NNNN-example-decision.md
+│   └── NNNN-another-example-decision.md
 └── src/
 ```
 
-Multi-context repo (presence of `GLOSSARY-MAP.md` at the root):
-
-```
-/
-├── GLOSSARY-MAP.md
-├── docs/adr/                          ← system-wide decisions
-└── src/
-    ├── ordering/
-    │   ├── GLOSSARY.md
-    │   └── docs/adr/                  ← context-specific decisions
-    └── billing/
-        ├── GLOSSARY.md
-        └── docs/adr/
-```
+If a `GLOSSARY-MAP.md` ever appears at the root, the repo has become multi-context: the map points to one `GLOSSARY.md` per context, and context-specific ADRs live in `<context>/docs/adr/` beside it.
 
 ## Use the glossary's vocabulary
 
@@ -48,4 +35,4 @@ If the concept you need isn't in the glossary yet, that's a signal: either you'r
 
 If your output contradicts an existing ADR, surface it explicitly rather than silently overriding:
 
-> _Contradicts ADR-0007 (event-sourced orders), but worth reopening because…_
+> _Contradicts ADR-NNNN (<decision title>), but worth reopening because…_
