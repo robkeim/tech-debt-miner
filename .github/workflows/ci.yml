@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          cache: true
+          cache_key_prefix: mise-${{ hashFiles('.tool-versions') }}
+      - run: uv sync --locked
+      - run: uv run gate
+
+  gate-config:
+    # Fork and Dependabot PRs get a read-only token, so they are skipped.
+    if: >-
+      github.event_name == 'pull_request'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Label and comment on gate config changes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          marker='<!-- gate-config-comment -->'
+          pattern='^(pyproject\.toml|\.?cspell[^/]*\.(json|jsonc|yaml|yml)|\.github/workflows/.*|(.*/)?gate/.*)$'
+          changed=$(gh pr diff "$PR" --name-only | grep -E "$pattern" || true)
+          [ -n "$changed" ] || exit 0
+          gh pr edit "$PR" --add-label gate-config || true
+          body=$(printf '%s\n**Gate config changed.** Check that this does not weaken the gate:\n\n%s\n' "$marker" "$(echo "$changed" | sed 's/^/- `/; s/$/`/')")
+          existing=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
+            --jq "map(select(.body | contains(\"$marker\"))) | first | .id // empty")
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GH_REPO/issues/comments/$existing" -f body="$body"
+          else
+            gh pr comment "$PR" --body "$body"
+          fi

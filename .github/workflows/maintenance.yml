@@ -1,0 +1,45 @@
+name: Maintenance
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tool-versions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@90f833d396d0cc3674b631d2d225e306476c303a # v5.2.10
+        with:
+          cache: true
+          cache_key_prefix: mise-${{ hashFiles('.tool-versions') }}
+      - name: Sync the tool-versions issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          outdated=$(mise outdated || true)
+          number=$(gh issue list --label tool-versions --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$outdated" ]; then
+            [ -z "$number" ] || gh issue close "$number" --comment "All pinned tools are current."
+            exit 0
+          fi
+          body=$(printf 'Outdated tools in `.tool-versions`:\n\n```\n%s\n```\n' "$outdated")
+          if [ -n "$number" ]; then
+            gh issue edit "$number" --body "$body"
+          else
+            gh issue create --title "chore: bump outdated tools in .tool-versions" --label tool-versions --body "$body"
+          fi
