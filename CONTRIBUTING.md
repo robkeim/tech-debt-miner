@@ -67,7 +67,6 @@ Requirements this convention places on the repo settings (set up in #11):
 - **Issue templates:** `.github/ISSUE_TEMPLATE/` has bug and feature forms that apply `needs-triage`. Blank issues stay enabled for wayfinder tickets.
 - **Changelog and releases:** none for now. The commit history keeps that option open.
 
-<<<<<<< HEAD
 ## Security checks
 
 Most checks run on GitHub's side and add no gate runtime. [SECURITY.md](SECURITY.md) covers reporting.
@@ -86,7 +85,7 @@ Left out as redundant:
 - **bandit:** ruff `ALL` includes the `S` rules.
 - **Semgrep:** overlaps CodeQL, sees one file at a time, and `semgrep ci` needs a login.
 - **OpenSSF Scorecard:** zizmor and the ruleset cover its useful checks.
-=======
+
 ## Testing
 
 Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network and LLM rules is in [ADR 0003](docs/adr/0003-tests-never-touch-network-or-llm.md).
@@ -106,7 +105,6 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 - **Config:** `filterwarnings = ["error"]` and `--durations=10` always on. No time limit; add a `slow` marker only if the suite gets slow.
 - **Writing tests:** every `feat` ships with tests and every `fix` with a regression test that fails before the fix. Review and the PR template's Test plan check this; there is no automation. `tdd` is the recommended default for agents, not mandatory.
 - **Not adopted:** mutation testing, for now.
->>>>>>> d556ff3 (docs: record testing policy (#7))
 
 ## Gate and git hooks
 
