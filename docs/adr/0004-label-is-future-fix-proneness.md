@@ -2,7 +2,9 @@
 
 Accepted. Decided in #34 from the research in #33.
 
-A file's Label is the number of distinct Fix commits that touch it after the Cutoff date. We do not run SZZ trace-back, so a Fix commit may repair a bug introduced after the Cutoff date. That is intended: the target is "which files will need bug fixes later", which is what technical-debt risk predicts, not "which files already hid a bug". Published labeling methods are noisy (about half of SZZ-identified fixes are not real fixes), and trace-back adds a noisy step without answering the question we ask.
+A file's Label is the number of distinct Fix commits that touch it after the Cutoff date. We do not run SZZ trace-back, so a Fix commit may repair a bug introduced after the Cutoff date. That is intended: the target is "which files will need bug fixes later", which is what technical-debt risk predicts, not "which files already hid a bug". Published labeling methods are noisy (about half of the commits SZZ identifies are not real fixes, per [Herbold et al. 2022](https://arxiv.org/abs/1911.08938)), and trace-back adds a noisy step without answering the question we ask.
+
+SZZ is the family of algorithms that finds bug-introducing commits by taking a bug-fixing commit and blaming the lines it changed. To learn more, start with the original paper, [Sliwerski et al. 2005](https://www.st.cs.uni-saarland.de/papers/msr2005/msr2005.pdf), then [Rosa et al. 2021](https://arxiv.org/abs/2102.03300) for how accurate its variants are.
 
 **Fix commit identification.** Two label sets, reported separately. The primary set is tracker-confirmed: the commit links a closed issue typed bug. The sensitivity set is keyword-only: a word-boundary match on `fix|fixes|fixed|bug|defect|patch`. Bare numbers never count as issue links, and a `(#N)` suffix is a PR number, not an issue ID.
 

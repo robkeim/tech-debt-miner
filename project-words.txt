@@ -13,6 +13,7 @@ docstrings
 editmsg
 filterwarnings
 gpgsign
+Herbold
 mattpocock
 modifyitems
 nodeid
@@ -23,6 +24,7 @@ pytestmark
 pythonpath
 robkeim
 shellcheck
+Sliwerski
 testpaths
 traveller
 venv
