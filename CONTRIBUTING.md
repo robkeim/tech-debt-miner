@@ -67,6 +67,7 @@ Requirements this convention places on the repo settings (set up in #11):
 - **Issue templates:** `.github/ISSUE_TEMPLATE/` has bug and feature forms that apply `needs-triage`. Blank issues stay enabled for wayfinder tickets.
 - **Changelog and releases:** none for now. The commit history keeps that option open.
 
+<<<<<<< HEAD
 ## Security checks
 
 Most checks run on GitHub's side and add no gate runtime. [SECURITY.md](SECURITY.md) covers reporting.
@@ -85,6 +86,27 @@ Left out as redundant:
 - **bandit:** ruff `ALL` includes the `S` rules.
 - **Semgrep:** overlaps CodeQL, sees one file at a time, and `semgrep ci` needs a login.
 - **OpenSSF Scorecard:** zizmor and the ruleset cover its useful checks.
+=======
+## Testing
+
+Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network and LLM rules is in [ADR 0003](docs/adr/0003-tests-never-touch-network-or-llm.md).
+
+- **Tiers:** every test carries one marker, enforced by a conftest hook and `--strict-markers`. Tests live under the matching directory, mirroring `src/tech_debt_miner/`.
+  - `unit` (`tests/unit/`): pure and in-memory.
+  - `integration` (`tests/integration/`): tiny fixture repo, real git, fake LLM, including the Dry-run end-to-end test.
+  - `policy` (`tests/policy/`): architecture rules such as "only the client imports the SDK" (ADR 0002) and the Leakage test.
+- **No network:** `pytest-socket` blocks all sockets in every test, with no localhost exception and no opt-out marker until a test truly needs one.
+- **LLM in tests:** a hand-written fake client for logic, plus a few committed recorded responses for parse and Replay fidelity. Recordings come from a manual script with the real key, never CI. A test fails if a recording lacks its Manifest metadata (model snapshot, request ID).
+- **Leakage test:** a fixture repo with commits before and after a Cutoff date; post-cutoff commits carry a poison marker. It runs through the Dry-run path and asserts the marker never appears in any prompt, feature, or churn and complexity input. It also checks it fails when the cutoff filter is disabled.
+- **Fixture repo:** generated in `tmp_path` by a shared helper with fixed author, committer and dates. No committed `.git` or bundle. The Dry-run test asserts zero LLM calls and a written Manifest.
+- **Property-based:** `hypothesis` only for scoring and ranking metrics, cutoff and date handling, and cache key stability. CI uses a derandomized profile.
+- **Order and clock:** `pytest-randomly` is always on and the seed is printed. An autouse fixture freezes the clock with `time-machine`; tests can override it.
+- **Coverage:** branch coverage with a global floor of 90% (`fail_under`) and a 90% diff-coverage gate on changed lines in CI (`diff-cover` against `origin/main`). `# pragma: no cover` needs a reason. The `--fast` gate skips both. 90 is a starting point to adapt; tests exist to catch regressions, so lower the number before writing a test just to hit it.
+- **Skips and flakes:** `skip` and `xfail` need a reason that links an issue, with `xfail_strict = true`. A flaky test is fixed or deleted; no retry plugins.
+- **Config:** `filterwarnings = ["error"]` and `--durations=10` always on. No time limit; add a `slow` marker only if the suite gets slow.
+- **Writing tests:** every `feat` ships with tests and every `fix` with a regression test that fails before the fix. Review and the PR template's Test plan check this; there is no automation. `tdd` is the recommended default for agents, not mandatory.
+- **Not adopted:** mutation testing, for now.
+>>>>>>> d556ff3 (docs: record testing policy (#7))
 
 ## Gate and git hooks
 

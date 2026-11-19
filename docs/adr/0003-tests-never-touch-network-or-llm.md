@@ -1,0 +1,3 @@
+# Tests never touch the network or the LLM, and leakage is tested
+
+Accepted. Every test runs with sockets blocked and no live LLM call; logic is tested against a fake client injected at the single choke point, and parse and Replay fidelity against a few committed recorded responses made by a manual script, never in CI. A Leakage test builds a fixture repo with commits after the Cutoff date carrying a poison marker and asserts the marker never reaches any prompt or feature. It runs in the default gate, so a rewound Run can't silently see the future. We accept that real provider behavior is only exercised by experiments, not tests, in exchange for a free, deterministic, key-free CI.
