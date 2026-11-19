@@ -165,7 +165,7 @@ Repo settings: squash-merge only with default message "Pull request title" (alre
 
 Both run Mondays at 06:00 UTC.
 
-- **`pip-audit`:** PR runs use `continue-on-error`, so findings show as annotations without blocking. The scheduled run fails on findings and GitHub emails the owner; no issue is filed.
+- **`pip-audit`:** PR runs use `continue-on-error`, so findings appear in the run summary without blocking. The scheduled run fails on findings and GitHub emails the owner; no issue is filed.
 - **`mise outdated`:** looks for an open issue labeled `tool-versions` first and edits it in place; it creates one only when none is open, so it never piles up tickets. It closes the issue when nothing is outdated and never fails the run.
 
 ### `gate-config` labeler
