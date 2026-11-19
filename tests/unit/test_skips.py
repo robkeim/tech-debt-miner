@@ -1,6 +1,6 @@
 import pytest
 
-from support.skips import SkipMarker, skip_errors
+from support.skips import SKIP_MARKERS, SkipMarker, skip_errors
 
 pytestmark = pytest.mark.unit
 
@@ -9,22 +9,22 @@ def errors_for(name: str, *args: object, **kwargs: object) -> list[str]:
     return skip_errors([SkipMarker("t::x", name, args, kwargs)])
 
 
-@pytest.mark.parametrize("name", ["skip", "skipif", "xfail"])
+@pytest.mark.parametrize("name", SKIP_MARKERS)
 def test_bare_marker_is_reported(name: str) -> None:
     assert "needs a reason" in errors_for(name)[0]
 
 
-@pytest.mark.parametrize("name", ["skip", "skipif", "xfail"])
+@pytest.mark.parametrize("name", SKIP_MARKERS)
 def test_empty_reason_is_reported(name: str) -> None:
     assert "needs a reason" in errors_for(name, reason="  ")[0]
 
 
-@pytest.mark.parametrize("name", ["skip", "skipif", "xfail"])
+@pytest.mark.parametrize("name", SKIP_MARKERS)
 def test_reason_without_issue_is_reported(name: str) -> None:
     assert "must link an issue" in errors_for(name, reason="flaky on CI")[0]
 
 
-@pytest.mark.parametrize("name", ["skip", "skipif", "xfail"])
+@pytest.mark.parametrize("name", SKIP_MARKERS)
 def test_issue_number_passes(name: str) -> None:
     assert errors_for(name, reason="blocked by #44") == []
 
