@@ -29,9 +29,12 @@ def git(repo: Path, *args: str, env: Mapping[str, str] | None = None) -> str:
     """Run git in `repo` with the user's and system's config ignored; return stdout.
 
     Ad hoc commits get the fixed identities and DEFAULT_DATE unless `env` overrides them.
+    Inherited `GIT_*` variables are dropped: git hooks export `GIT_DIR` and `GIT_INDEX_FILE`,
+    which would point these commands at the real repo instead of the fixture.
     """
+    inherited = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
     isolated = {
-        **os.environ,
+        **inherited,
         "GIT_CONFIG_GLOBAL": os.devnull,
         "GIT_CONFIG_NOSYSTEM": "1",
         **_commit_env(DEFAULT_DATE),

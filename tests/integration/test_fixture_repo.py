@@ -45,6 +45,20 @@ def test_different_content_gives_a_different_sha(tmp_path: Path) -> None:
     assert head_sha(one) != head_sha(two)
 
 
+def test_inherited_git_environment_does_not_leak_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Hooks export GIT_DIR and GIT_INDEX_FILE; the fixture must not touch what they name."""
+    outer = tmp_path / "outer"
+    outer.mkdir()
+    monkeypatch.setenv("GIT_DIR", str(outer / ".git"))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(outer / "index"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(outer))
+    repo = build_fixture_repo(tmp_path / "repo", COMMITS)
+    assert (repo / ".git").is_dir()
+    assert list(outer.iterdir()) == []
+
+
 def test_naive_dates_are_rejected(tmp_path: Path) -> None:
     naive = (Commit("first", {"a.py": ""}, datetime(2020, 1, 1)),)  # noqa: DTZ001 - the case under test
     with pytest.raises(ValueError, match="timezone-aware"):
