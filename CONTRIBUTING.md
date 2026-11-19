@@ -131,7 +131,32 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 - CI runs the full gate from the workflow on `main`, so `--no-verify` only delays a failure.
 - Every ignore needs a rule code and reason (`PGH003`, `ANN401`, `reportUnnecessaryTypeIgnoreComment`).
 - A CI step labels any PR that edits gate config (ruff, pyright, pytest and coverage sections of `pyproject.toml`, the cspell config but not its words list, the gate package, workflows) with `gate-config` and comments on it. It never fails the run; it makes weakening visible in review.
-- The agent-side deny list for `--no-verify` and config edits is decided in #12.
+- The agent-side guardrails for `--no-verify` and config edits are in [Agent workflow](#agent-workflow).
+
+## Agent workflow
+
+[AGENTS.md](AGENTS.md) routes agents to the right section of this file. The human sets the direction, decides, reviews every change and merges.
+
+### Definition of done
+
+- `uv run gate` passes locally.
+- Tests follow [Testing](#testing).
+- The glossary, an ADR or the relevant doc is updated when the change touches them.
+- Gate config is untouched unless the issue asks for it.
+- The PR body fills in the template.
+
+### Review before a PR opens
+
+Agent-authored PRs run the `code-review` skill against the branch's merge-base with `main`. The agent fixes each finding or lists it under "Tradeoffs to check" in the PR body. No automation checks this, and the PR template has no checkbox for it.
+
+### Limits on the agent
+
+- **Never merges.** The human merges with their own click; branch protection (#11) is the enforcement.
+- **Hook:** `.claude/hooks/block-dangerous-git.sh` blocks `--no-verify` and `-n`, force or delete pushes, pushes to `main` or `master`, a bare `git push`, `gh pr merge`, `reset --hard`, `clean -f`, `branch -D`, and `checkout .` or `restore .`. Pushing a feature branch is allowed.
+- **Deny** (`.claude/settings.json`): reading `.env*`, `gh pr merge`, force pushes, and `--no-verify`.
+- **Ask:** edits to gate config (`pyproject.toml`, the cspell config, the gate package, workflows) and to `.claude/`, so the agent can't quietly loosen its own guardrails. A prompt, not a dead end, for legitimate gate work.
+- **Backstop:** the hook and permissions are conveniences. CI and the `gate-config` label from [Gate integrity](#gate-integrity) are authoritative.
+- **Personal overrides** go in `.claude/settings.local.json`, which is git-ignored.
 
 ## CI and merge rules
 
