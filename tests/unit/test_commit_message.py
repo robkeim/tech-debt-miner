@@ -61,6 +61,11 @@ def test_long_trailer_is_exempt_from_the_wrap() -> None:
     assert validate_message(f"feat!: change it\n\n{trailer}") == []
 
 
+def test_prose_that_looks_like_a_label_is_not_a_trailer() -> None:
+    errors = validate_message("fix: x\n\nNote: " + "a" * 70)
+    assert errors == ["body line 3 is 76 characters; wrap at 72"]
+
+
 def test_long_body_line_is_reported() -> None:
     errors = validate_message("fix: x\n\n" + "a" * 73)
     assert errors == ["body line 3 is 73 characters; wrap at 72"]

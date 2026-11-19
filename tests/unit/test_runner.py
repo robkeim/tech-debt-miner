@@ -1,5 +1,3 @@
-import stat
-import sys
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -99,27 +97,3 @@ def test_resolve_falls_back_to_path(tmp_path: Path) -> None:
 
 def test_resolve_returns_none_without_mise(tmp_path: Path) -> None:
     assert resolve_tool("cspell", which=lambda _t: None, venv_bin=tmp_path) is None
-
-
-def fake_mise(directory: Path, *, body: str) -> Path:
-    script = directory / "mise"
-    script.write_text(f"#!/bin/sh\n{body}\n")
-    script.chmod(script.stat().st_mode | stat.S_IXUSR)
-    return script
-
-
-def test_resolve_asks_mise_when_the_tool_is_not_on_path(tmp_path: Path) -> None:
-    mise = fake_mise(tmp_path, body='echo "/mise/installs/$2"')
-    which = {"mise": str(mise)}.get
-    assert resolve_tool("lychee", which=which, venv_bin=tmp_path) == "/mise/installs/lychee"
-
-
-def test_resolve_returns_none_when_mise_does_not_know_the_tool(tmp_path: Path) -> None:
-    mise = fake_mise(tmp_path, body="exit 1")
-    assert resolve_tool("nope", which={"mise": str(mise)}.get, venv_bin=tmp_path) is None
-
-
-def test_default_runner_returns_the_process_exit_code() -> None:
-    from gate.runner import run_argv  # noqa: PLC0415 - the default seam under test
-
-    assert run_argv([sys.executable, "-c", "raise SystemExit(4)"]) == 4

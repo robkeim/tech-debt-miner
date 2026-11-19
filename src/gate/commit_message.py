@@ -25,7 +25,8 @@ _HEADER = re.compile(
     r"^(?P<type>[a-z]+)(?:\((?P<scope>[^)]*)\))?(?P<breaking>!)?: (?P<subject>.*)$",
 )
 _SCOPE = re.compile(r"^[a-z][a-z0-9-]*$")
-_TRAILER = re.compile(r"^(?:[A-Za-z][A-Za-z-]*|BREAKING CHANGE): \S")
+# Git trailers are hyphenated tokens (Co-Authored-By, Signed-off-by); plain `Note:` is prose.
+_TRAILER = re.compile(r"^(?:[A-Z][A-Za-z]*(?:-[A-Za-z]+)+|BREAKING CHANGE): \S")
 _SCISSORS = "# ------------------------ >8 ------------------------"
 
 

@@ -12,7 +12,7 @@ DIFF_COVER_FLOOR = "90"
 
 _FORMAT = Step("ruff format", ("ruff", "format", "--check", "."))
 _LINT = Step("ruff check", ("ruff", "check", "."))
-_TYPES = Step("pyright", ("pyright",))
+_PYRIGHT = Step("pyright", ("pyright",))
 _TESTS = Step("pytest", ("pytest", "--cov", "--cov-report=xml"))
 _DIFF_COVER = Step(
     "diff-cover",
@@ -33,19 +33,11 @@ FIX_STEPS = (
     Step("ruff format", ("ruff", "format", ".")),
     Step("ruff check --fix", ("ruff", "check", "--fix", ".")),
 )
+HOOK_TYPES = ("pre-commit", "commit-msg", "pre-push")
 INSTALL_STEPS = (
     Step(
         "pre-commit install",
-        (
-            "pre-commit",
-            "install",
-            "--hook-type",
-            "pre-commit",
-            "--hook-type",
-            "commit-msg",
-            "--hook-type",
-            "pre-push",
-        ),
+        ("pre-commit", "install", *(arg for hook in HOOK_TYPES for arg in ("--hook-type", hook))),
     ),
 )
 
@@ -57,7 +49,7 @@ def _is_workflow(path: str) -> bool:
 def fast_steps(staged: Sequence[str], root: Path) -> list[Step | Skipped]:
     """Return the pre-commit hook steps. Spelling covers staged files only."""
     spellable = [path for path in staged if path.endswith(SPELLCHECKED) and (root / path).is_file()]
-    steps: list[Step | Skipped] = [_FORMAT, _LINT, _TYPES]
+    steps: list[Step | Skipped] = [_FORMAT, _LINT, _PYRIGHT]
     if spellable:
         steps.append(Step("cspell", ("cspell", "--no-progress", *spellable)))
     else:
@@ -71,7 +63,7 @@ def full_steps(*, workflows_changed: bool, in_ci: bool) -> list[Step | Skipped]:
     return [
         _FORMAT,
         _LINT,
-        _TYPES,
+        _PYRIGHT,
         _TESTS,
         _DIFF_COVER,
         _CSPELL_ALL,

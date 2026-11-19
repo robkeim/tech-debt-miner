@@ -2,8 +2,9 @@ from pathlib import Path
 
 import pytest
 
+from gate.repo import MAIN_REF
 from gate.runner import Skipped, Step
-from gate.steps import fast_steps, full_steps
+from gate.steps import DIFF_COVER_FLOOR, fast_steps, full_steps
 
 pytestmark = pytest.mark.unit
 
@@ -74,5 +75,5 @@ def test_diff_cover_requires_the_main_ref() -> None:
         s for s in full_steps(workflows_changed=False, in_ci=True) if s.name == "diff-cover"
     )
     assert isinstance(diff_cover, Step)
-    assert diff_cover.needs_ref == "origin/main"
-    assert "--fail-under=90" in diff_cover.argv
+    assert diff_cover.needs_ref == MAIN_REF
+    assert f"--fail-under={DIFF_COVER_FLOOR}" in diff_cover.argv
