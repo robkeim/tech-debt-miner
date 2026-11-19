@@ -46,9 +46,9 @@ PRs are squash-merged, so the PR title becomes the commit on `main`.
 
 ### Checks
 
-- **Locally:** a `commit-msg` hook validates every commit message (wiring in #10).
+- **Locally:** a `commit-msg` hook validates every commit message (see [Gate and git hooks](#gate-and-git-hooks)).
 - **In CI:** the PR title is validated. Branch commits are not, since they are squashed away.
-- **Tool:** a Python-native checker (for example `commitizen`), so the repo needs no Node dependency. Exact tool and wiring are decided in #4, #10 and #11.
+- **Tool:** `commitizen`'s parser plus the repo's extra rules, in the gate package, so the repo needs no Node dependency. The hook and the CI title check call the same function.
 
 ### Merge requirements
 
@@ -108,7 +108,30 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 
 ## Gate and git hooks
 
-To be decided in #10.
+`uv run gate` is the single definition of green. Hooks call it fast, CI calls it in full, and CI is authoritative.
+
+| Mode | Where it runs | What it runs |
+| --- | --- | --- |
+| `uv run gate --fast` | `pre-commit` hook | `ruff format --check`, `ruff check`, `pyright` (whole project); `cspell` on staged files; `actionlint` and `zizmor` only when workflow files are staged |
+| `uv run gate` | `pre-push` hook, CI | Everything in fast, plus `pytest` with coverage, `diff-cover`, full `cspell`, `lychee` |
+| `uv run gate commit-msg <file>` | `commit-msg` hook | Commit message rules from [Commits and PRs](#commits-and-prs) |
+| `uv run gate pr-title` | CI | The same function, applied to the PR title |
+
+`pip-audit` is CI only (see [Security checks](#security-checks)).
+
+- **Hooks:** `pre-commit` with three stages (`pre-commit`, `commit-msg`, `pre-push`). Install once with `uv run gate install`; nothing enforces it, since CI catches whatever a missing hook would have.
+- **Report only:** the gate never changes files. Humans run `uv run gate --fix` (`ruff format` and `ruff check --fix`).
+- **Output:** every step runs even after a failure. A pass/fail summary prints at the end and the exit code is nonzero if any step failed.
+- **`diff-cover` locally:** compares against the existing `origin/main` ref with no fetch. A stale ref is fine because CI recomputes it. A missing ref is a failure, not a skip.
+- **Non-Python tools:** `cspell`, `lychee` and `actionlint` are not in the `uv` environment and the repo has no `package.json`. They are pinned in `.tool-versions` (mise); run `mise install`. CI installs from the same file. The gate fails loudly when one is missing and never skips silently. `zizmor` and `pip-audit` are in the `dev` group.
+- **Tool freshness:** Dependabot can't read `.tool-versions`, so a weekly scheduled workflow (specified in #11) runs `mise outdated` and keeps one open issue labeled `tool-versions` up to date. It never fails the run. Bumps are manual PRs. GitHub pauses scheduled workflows after 60 days of repo inactivity; re-enable them in the Actions tab.
+
+### Gate integrity
+
+- CI runs the full gate from the workflow on `main`, so `--no-verify` only delays a failure.
+- Every ignore needs a rule code and reason (`PGH003`, `ANN401`, `reportUnnecessaryTypeIgnoreComment`).
+- A CI step labels any PR that edits gate config (ruff, pyright, pytest and coverage sections of `pyproject.toml`, the cspell config but not its words list, the gate package, workflows) with `gate-config` and comments on it. It never fails the run; it makes weakening visible in review.
+- The agent-side deny list for `--no-verify` and config edits is decided in #12.
 
 ## CI and merge rules
 
