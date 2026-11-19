@@ -6,6 +6,7 @@ backtest
 backtests
 cacheprovider
 capsys
+commitizen
 delenv
 derandomize
 docstrings
