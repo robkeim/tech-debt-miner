@@ -4,12 +4,14 @@ import argparse
 import os
 import sys
 from collections.abc import Sequence
+from enum import Enum
 from pathlib import Path
 
 from gate import repo
 from gate.commit_message import strip_comments, validate_message, validate_title
-from gate.runner import Result, Step, exit_code, run_steps
-from gate.steps import FIX_STEPS, INSTALL_STEPS, fast_steps, full_steps
+from gate.models import Step
+from gate.runner import Environment, exit_code, run_steps
+from gate.steps import FIX_STEPS, INSTALL_STEPS, WorkflowLint, fast_steps, full_steps
 
 PR_TITLE_ENV = "PR_TITLE"
 
@@ -46,7 +48,7 @@ def _spellcheck(message: str, root: Path) -> int:
         ("cspell", "--no-progress", "--config", str(root / "cspell.json"), "stdin"),
         stdin=strip_comments(message) + "\n",
     )
-    return exit_code(run_steps([step], ref_exists=lambda ref: repo.ref_exists(ref, root)))
+    return exit_code(run_steps([step], Environment(root)))
 
 
 def _commit_msg(file: Path) -> int:
@@ -63,35 +65,48 @@ def _pr_title() -> int:
     return _report(validate_title(title), "PR title")
 
 
-def _steps(args: argparse.Namespace, root: Path) -> list[Result]:
-    def ref_exists(ref: str) -> bool:
-        return repo.ref_exists(ref, root)
+class Mode(Enum):
+    """What one invocation does, decided once from the parsed arguments."""
 
-    if args.command == "install":
-        return run_steps(INSTALL_STEPS, ref_exists=ref_exists)
+    FULL = "full"
+    FAST = "fast"
+    FIX = "fix"
+    INSTALL = "install"
+    COMMIT_MSG = "commit-msg"
+    PR_TITLE = "pr-title"
+
+
+def _mode(parser: argparse.ArgumentParser, args: argparse.Namespace) -> Mode:
+    if args.command and (args.fast or args.fix):
+        parser.error("--fast and --fix cannot be combined with a subcommand")
+    if args.fast and args.fix:
+        parser.error("--fast and --fix cannot be combined")
+    if args.command:
+        return Mode(args.command)
     if args.fix:
-        return run_steps(FIX_STEPS, ref_exists=ref_exists)
-    if args.fast:
-        return run_steps(fast_steps(repo.staged_files(root), root), ref_exists=ref_exists)
-    steps = full_steps(
-        workflows_changed=repo.workflows_changed_since(repo.MAIN_REF, root),
-        in_ci=bool(os.environ.get("CI")),
-    )
-    return run_steps(steps, ref_exists=ref_exists)
+        return Mode.FIX
+    return Mode.FAST if args.fast else Mode.FULL
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args.command and (args.fast or args.fix):
-        parser.error("--fast and --fix cannot be combined with a subcommand")
-    if args.fast and args.fix:
-        parser.error("--fast and --fix cannot be combined")
-    if args.command == "commit-msg":
-        return _commit_msg(args.file)
-    if args.command == "pr-title":
-        return _pr_title()
-    return exit_code(_steps(args, Path.cwd()))
+    root = Path.cwd()
+    match _mode(parser, args):
+        case Mode.COMMIT_MSG:
+            return _commit_msg(args.file)
+        case Mode.PR_TITLE:
+            return _pr_title()
+        case Mode.INSTALL:
+            steps = INSTALL_STEPS
+        case Mode.FIX:
+            steps = FIX_STEPS
+        case Mode.FAST:
+            steps = fast_steps(repo.staged_files(root), root)
+        case Mode.FULL:
+            workflows_changed = repo.workflows_changed_since(repo.MAIN_REF, root)
+            steps = full_steps(WorkflowLint.when(bool(os.environ.get("CI")) or workflows_changed))
+    return exit_code(run_steps(steps, Environment(root)))
 
 
 if __name__ == "__main__":
