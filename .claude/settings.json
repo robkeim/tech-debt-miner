@@ -13,13 +13,7 @@
       "Edit(./.cspell.*)",
       "Edit(./src/gate/**)",
       "Edit(./.github/workflows/**)",
-      "Edit(./.claude/**)",
-      "Write(./pyproject.toml)",
-      "Write(./cspell.*)",
-      "Write(./.cspell.*)",
-      "Write(./src/gate/**)",
-      "Write(./.github/workflows/**)",
-      "Write(./.claude/**)"
+      "Edit(./.claude/**)"
     ]
   },
   "hooks": {
