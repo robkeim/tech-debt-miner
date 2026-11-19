@@ -1,0 +1,22 @@
+repos:
+  - repo: local
+    hooks:
+      - id: gate-fast
+        name: gate --fast
+        entry: uv run gate --fast
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: gate-commit-msg
+        name: gate commit-msg
+        entry: uv run gate commit-msg
+        language: system
+        stages: [commit-msg]
+      - id: gate-full
+        name: gate
+        entry: uv run gate
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
