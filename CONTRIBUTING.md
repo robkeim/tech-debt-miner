@@ -63,7 +63,7 @@ Requirements this convention places on the repo settings (implementation tracked
 - **Branch names:** `<github-user>/<slug>`, for example `robkeim/commit-and-pr-conventions`. Convention only; not enforced, since the name is gone after the squash.
 - **Issue links:** put `Closes #N` in the PR body. Commit footers need no issue reference; the `(#N)` suffix links the commit to the PR.
 - **Keeping history:** the PR body stays on GitHub, reachable from the `(#N)` link. Put lasting rationale in an ADR or the relevant doc, not only the PR body, and edit the squash message at merge time when a change needs commit-level context.
-- **PR template:** `.github/pull_request_template.md` has Summary, Linked issue, Test plan, and Tradeoffs to check.
+- **PR template:** `.github/pull_request_template.md` has Summary (with `Closes #N`), Evidence, Merge Danger (one-way or two-way door, blast radius), and Tradeoffs to check.
 - **Issue templates:** `.github/ISSUE_TEMPLATE/` has bug and feature forms that apply `needs-triage`. Blank issues stay enabled for wayfinder tickets.
 - **Changelog and releases:** none for now. The commit history keeps that option open.
 

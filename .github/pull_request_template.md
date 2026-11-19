@@ -1,14 +1,23 @@
 ## Summary
 
-<!-- What changed and why, in a few short bullets. -->
-
-## Linked issue
+<!-- Smallest view that makes the point: pseudocode, call tree, file tree, diff or Mermaid. -->
 
 Closes #
 
-## Test plan
+## Evidence
 
-<!-- How you verified it. -->
+- **Before:** <!-- screenshot, output or failing test run -->
+  **After:** <!-- screenshot, output or passing test run -->
+
+## Merge Danger
+
+**Door:** <!-- one-way or two-way -->
+
+<!-- Optional: why. -->
+
+**Blast Radius:** <!-- one word -->
+
+<!-- Optional: potential ramifications of merge. -->
 
 ## Tradeoffs to check
 
