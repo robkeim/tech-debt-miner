@@ -55,6 +55,8 @@ jobs:
           changed=$(gh pr diff "$PR" --name-only | grep -E "$pattern" || true)
           [ -n "$changed" ] || exit 0
           gh pr edit "$PR" --add-label gate-config || true
+          # The backticks below are literal Markdown, not expansions.
+          # shellcheck disable=SC2016
           body=$(printf '%s\n**Gate config changed.** Check that this does not weaken the gate:\n\n%s\n' "$marker" "$(echo "$changed" | sed 's/^/- `/; s/$/`/')")
           existing=$(gh api "repos/$GH_REPO/issues/$PR/comments" --paginate \
             --jq "map(select(.body | contains(\"$marker\"))) | first | .id // empty")

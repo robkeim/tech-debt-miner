@@ -48,7 +48,7 @@ PRs are squash-merged, so the PR title becomes the commit on `main`.
 
 - **Locally:** a `commit-msg` hook validates every commit message (see [Gate and git hooks](#gate-and-git-hooks)).
 - **In CI:** the PR title is validated. Branch commits are not, since they are squashed away.
-- **Tool:** `commitizen`'s parser plus the repo's extra rules, in the gate package, so the repo needs no Node dependency. The hook and the CI title check call the same function.
+- **Tool:** a small validator in the gate package (`gate.commit_message`), so the repo needs no Node dependency. The rules are stricter than stock Conventional Commits (no `style` type, lowercase subject, 72-column wrap), so a general parser such as `commitizen` would add a dependency without saving any code. The hook and the CI title check call the same function.
 
 ### Merge requirements
 

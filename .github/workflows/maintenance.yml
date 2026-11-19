@@ -37,6 +37,8 @@ jobs:
             [ -z "$number" ] || gh issue close "$number" --comment "All pinned tools are current."
             exit 0
           fi
+          # The backticks below are literal Markdown, not expansions.
+          # shellcheck disable=SC2016
           body=$(printf 'Outdated tools in `.tool-versions`:\n\n```\n%s\n```\n' "$outdated")
           if [ -n "$number" ]; then
             gh issue edit "$number" --body "$body"

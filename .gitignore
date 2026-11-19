@@ -224,3 +224,6 @@ __marimo__/
 
 # Claude Code personal overrides
 .claude/settings.local.json
+
+# Gate output
+coverage.xml

@@ -1,0 +1,95 @@
+[project]
+name = "tech-debt-miner"
+version = "0.0.0"
+description = "Backtest whether an LLM can rank files by technical-debt risk better than churn x complexity."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.14"
+dependencies = []
+
+[project.scripts]
+gate = "gate.cli:main"
+
+[dependency-groups]
+dev = [
+    "diff-cover",
+    "hypothesis",
+    "pip-audit",
+    "pre-commit",
+    "pyright",
+    "pytest",
+    "pytest-cov",
+    "pytest-randomly",
+    "pytest-socket",
+    "ruff",
+    "time-machine",
+    "zizmor",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gate", "src/tech_debt_miner"]
+
+[tool.ruff]
+src = ["src", "tests"]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "COM812", # conflicts with the formatter
+    "CPY001", # no copyright headers
+    "D1",     # missing docstrings
+    "D203",   # conflicts with D211
+    "D213",   # conflicts with D212
+    "TC001",  # typing-only imports: annotations are lazy on 3.14, so the block buys nothing
+    "TC002",  # same
+    "TC003",  # same
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/gate/cli.py" = ["T201"] # the CLI's job is to print
+"tests/**" = [
+    "INP001", # test dirs are namespace packages; importlib mode and `pythonpath` find them
+    "S101",   # assert is how pytest tests assert
+    "PLR2004", # magic values are fine in assertions
+]
+
+[tool.pyright]
+include = ["src", "tests"]
+extraPaths = ["src", "tests"]
+pythonVersion = "3.14"
+typeCheckingMode = "strict"
+reportUnnecessaryTypeIgnoreComment = true
+
+[tool.pytest.ini_options]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--import-mode=importlib",
+    "--durations=10",
+    "--disable-socket",
+    "-p",
+    "no:cacheprovider",
+]
+pythonpath = ["tests"]
+testpaths = ["tests"]
+markers = [
+    "unit: pure and in-memory (tests/unit/)",
+    "integration: tiny fixture repo, real git, fake LLM (tests/integration/)",
+    "policy: architecture rules (tests/policy/)",
+]
+filterwarnings = ["error"]
+xfail_strict = true
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true
+exclude_also = ["if __name__ == .__main__.:"]
