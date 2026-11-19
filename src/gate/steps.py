@@ -1,10 +1,11 @@
 """The gate's steps, per mode. See CONTRIBUTING.md#gate-and-git-hooks."""
 
 from collections.abc import Sequence
+from enum import Enum
 from pathlib import Path
 
+from gate.models import Skipped, Step
 from gate.repo import MAIN_REF, WORKFLOWS
-from gate.runner import Skipped, Step
 
 SPELLCHECKED = (".py", ".md", ".yml", ".yaml", ".toml", ".json")
 SPELLCHECK_GLOBS = tuple(f"**/*{suffix}" for suffix in SPELLCHECKED)
@@ -44,6 +45,17 @@ INSTALL_STEPS = (
 )
 
 
+class WorkflowLint(Enum):
+    """Whether the workflow linters (actionlint, zizmor) run or are skipped."""
+
+    RUN = "run"
+    SKIP = "skip"
+
+    @classmethod
+    def when(cls, relevant: bool) -> WorkflowLint:  # noqa: FBT001 - the one place a bool becomes a mode
+        return cls.RUN if relevant else cls.SKIP
+
+
 def _is_workflow(path: str) -> bool:
     return path.startswith(f"{WORKFLOWS}/")
 
@@ -56,12 +68,12 @@ def fast_steps(staged: Sequence[str], root: Path) -> list[Step | Skipped]:
         steps.append(Step("cspell", ("cspell", "--no-progress", *spellable)))
     else:
         steps.append(Skipped("cspell", "no staged files to check"))
-    steps.extend(_workflow_steps(run=any(_is_workflow(path) for path in staged)))
+    steps.extend(_workflow_linters(WorkflowLint.when(any(_is_workflow(path) for path in staged))))
     return steps
 
 
-def full_steps(*, workflows_changed: bool, in_ci: bool) -> list[Step | Skipped]:
-    """Return the pre-push and CI steps. Workflow linters run in CI or when relevant."""
+def full_steps(workflow_lint: WorkflowLint) -> list[Step | Skipped]:
+    """Return the pre-push and CI steps. The caller decides whether workflow linters run."""
     return [
         _FORMAT,
         _LINT,
@@ -70,12 +82,12 @@ def full_steps(*, workflows_changed: bool, in_ci: bool) -> list[Step | Skipped]:
         _DIFF_COVER,
         _CSPELL_ALL,
         _LYCHEE,
-        *_workflow_steps(run=in_ci or workflows_changed),
+        *_workflow_linters(workflow_lint),
     ]
 
 
-def _workflow_steps(*, run: bool) -> list[Step | Skipped]:
-    if run:
+def _workflow_linters(workflow_lint: WorkflowLint) -> list[Step | Skipped]:
+    if workflow_lint is WorkflowLint.RUN:
         return [_ACTIONLINT, _ZIZMOR]
     return [
         Skipped("actionlint", "no workflow changes"),

@@ -7,7 +7,7 @@ import pytest
 import time_machine
 from hypothesis import HealthCheck, settings
 
-from support.tiers import tier_errors
+from support.tiers import CollectedTest, tier_errors
 
 TESTS_ROOT = Path(__file__).parent
 FROZEN_NOW = datetime(2024, 1, 15, 12, 0, tzinfo=UTC)
@@ -23,7 +23,11 @@ settings.load_profile("ci" if os.environ.get("CI") else "default")
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     errors = tier_errors(
         (
-            (item.nodeid, Path(item.path), {mark.name for mark in item.iter_markers()})
+            CollectedTest(
+                item.nodeid,
+                Path(item.path),
+                frozenset(mark.name for mark in item.iter_markers()),
+            )
             for item in items
         ),
         TESTS_ROOT,

@@ -4,7 +4,9 @@ from pathlib import Path
 import pytest
 
 from gate import cli
-from gate.runner import Result, Skipped, Status, Step
+from gate.models import Result, Skipped, Status, Step
+from gate.runner import Environment
+from support.steps import step_names
 
 pytestmark = pytest.mark.unit
 
@@ -15,11 +17,11 @@ class Recorder:
     def __init__(self, status: Status = "pass") -> None:
         self.status: Status = status
         self.steps: list[Step | Skipped] = []
-        self.kwargs: dict[str, object] = {}
+        self.env: Environment | None = None
 
-    def __call__(self, steps: Sequence[Step | Skipped], **kwargs: object) -> list[Result]:
+    def __call__(self, steps: Sequence[Step | Skipped], env: Environment) -> list[Result]:
         self.steps = list(steps)
-        self.kwargs = kwargs
+        self.env = env
         return [Result("x", self.status)]
 
 
@@ -31,6 +33,10 @@ def no_workflow_changes(_ref: str, _root: Path) -> bool:
     return False
 
 
+def workflow_changes(_ref: str, _root: Path) -> bool:
+    return True
+
+
 @pytest.fixture
 def recorder(monkeypatch: pytest.MonkeyPatch) -> Recorder:
     recorder = Recorder()
@@ -38,10 +44,6 @@ def recorder(monkeypatch: pytest.MonkeyPatch) -> Recorder:
     monkeypatch.setattr(cli.repo, "staged_files", no_staged_files)
     monkeypatch.setattr(cli.repo, "workflows_changed_since", no_workflow_changes)
     return recorder
-
-
-def names(recorder: Recorder) -> list[str]:
-    return [step.name for step in recorder.steps]
 
 
 def test_commit_msg_accepts_a_valid_message(tmp_path: Path, recorder: Recorder) -> None:
@@ -77,7 +79,7 @@ def test_commit_msg_spellchecks_the_message_without_git_comments(
 ) -> None:
     seen: list[str | None] = []
 
-    def run_steps(steps: Sequence[Step | Skipped], **_kwargs: object) -> list[Result]:
+    def run_steps(steps: Sequence[Step | Skipped], _env: Environment) -> list[Result]:
         (step,) = steps
         assert isinstance(step, Step)
         seen.append(step.stdin)
@@ -113,13 +115,13 @@ def test_pr_title_fails_when_the_variable_is_unset(
 
 def test_fast_runs_the_fast_steps(recorder: Recorder) -> None:
     assert cli.main(["--fast"]) == 0
-    assert names(recorder)[:3] == ["ruff format", "ruff check", "pyright"]
-    assert "pytest" not in names(recorder)
+    assert step_names(recorder.steps)[:3] == ["ruff format", "ruff check", "pyright"]
+    assert "pytest" not in step_names(recorder.steps)
 
 
 def test_default_runs_the_full_gate(recorder: Recorder) -> None:
     assert cli.main([]) == 0
-    assert {"pytest", "diff-cover", "lychee"} <= set(names(recorder))
+    assert {"pytest", "diff-cover", "lychee"} <= set(step_names(recorder.steps))
 
 
 def test_ci_env_runs_the_workflow_linters(
@@ -136,26 +138,33 @@ def test_failing_step_gives_a_nonzero_exit(monkeypatch: pytest.MonkeyPatch) -> N
     assert cli.main([]) == 1
 
 
-def test_ref_checks_query_the_working_directory(
+def test_steps_run_against_the_working_directory(recorder: Recorder) -> None:
+    cli.main([])
+    assert recorder.env is not None
+    assert recorder.env.root == Path.cwd()
+
+
+def test_workflow_changes_run_the_workflow_linters_locally(
     recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    asked: list[tuple[str, Path]] = []
-
-    def ref_exists(ref: str, root: Path) -> bool:
-        asked.append((ref, root))
-        return True
-
-    monkeypatch.setattr(cli.repo, "ref_exists", ref_exists)
+    monkeypatch.delenv("CI", raising=False)
+    monkeypatch.setattr(cli.repo, "workflows_changed_since", workflow_changes)
     cli.main([])
-    check = recorder.kwargs["ref_exists"]
-    assert callable(check)
-    assert check("origin/main") is True
-    assert asked == [("origin/main", Path.cwd())]
+    assert not any(isinstance(step, Skipped) for step in recorder.steps)
+
+
+def test_no_workflow_changes_skip_the_workflow_linters_locally(
+    recorder: Recorder, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("CI", raising=False)
+    cli.main([])
+    skipped = [step.name for step in recorder.steps if isinstance(step, Skipped)]
+    assert skipped == ["actionlint", "zizmor"]
 
 
 def test_fix_applies_ruff_fixes(recorder: Recorder) -> None:
     assert cli.main(["--fix"]) == 0
-    assert names(recorder) == ["ruff format", "ruff check --fix"]
+    assert step_names(recorder.steps) == ["ruff format", "ruff check --fix"]
 
 
 def test_install_installs_all_three_hook_stages(recorder: Recorder) -> None:
