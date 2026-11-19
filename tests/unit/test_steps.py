@@ -70,6 +70,13 @@ def test_full_runs_workflow_linters_locally_when_workflows_changed() -> None:
     assert skipped(full_steps(workflows_changed=True, in_ci=False)) == []
 
 
+def test_actionlint_requires_shellcheck() -> None:
+    steps = full_steps(workflows_changed=True, in_ci=False)
+    actionlint = next(s for s in steps if s.name == "actionlint")
+    assert isinstance(actionlint, Step)
+    assert actionlint.requires == ("shellcheck",)
+
+
 def test_diff_cover_requires_the_main_ref() -> None:
     diff_cover = next(
         s for s in full_steps(workflows_changed=False, in_ci=True) if s.name == "diff-cover"

@@ -44,19 +44,50 @@ def names(recorder: Recorder) -> list[str]:
     return [step.name for step in recorder.steps]
 
 
-def test_commit_msg_accepts_a_valid_message(tmp_path: Path) -> None:
+def test_commit_msg_accepts_a_valid_message(tmp_path: Path, recorder: Recorder) -> None:
     message = tmp_path / "COMMIT_EDITMSG"
     message.write_text("feat: add ranking\n", encoding="utf-8")
     assert cli.main(["commit-msg", str(message)]) == 0
+    (step,) = recorder.steps
+    assert isinstance(step, Step)
+    assert step.argv[:4] == ("cspell", "--no-progress", "--config", str(Path.cwd() / "cspell.json"))
 
 
 def test_commit_msg_rejects_an_invalid_message(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], recorder: Recorder
 ) -> None:
     message = tmp_path / "COMMIT_EDITMSG"
     message.write_text("Added stuff.\n", encoding="utf-8")
     assert cli.main(["commit-msg", str(message)]) == 1
     assert "commit message is invalid" in capsys.readouterr().err
+    assert len(recorder.steps) == 1  # spelling still runs, so one pass shows every problem
+
+
+def test_commit_msg_fails_on_a_spelling_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "run_steps", Recorder(status="fail"))
+    message = tmp_path / "COMMIT_EDITMSG"
+    message.write_text("feat: add ranking\n", encoding="utf-8")
+    assert cli.main(["commit-msg", str(message)]) == 1
+
+
+def test_commit_msg_spellchecks_the_message_without_git_comments(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    seen: list[str | None] = []
+
+    def run_steps(steps: Sequence[Step | Skipped], **_kwargs: object) -> list[Result]:
+        (step,) = steps
+        assert isinstance(step, Step)
+        seen.append(step.stdin)
+        return [Result("x", "pass")]
+
+    monkeypatch.setattr(cli, "run_steps", run_steps)
+    message = tmp_path / "COMMIT_EDITMSG"
+    message.write_text("feat: add ranking\n# On branch some-branch-name\n", encoding="utf-8")
+    cli.main(["commit-msg", str(message)])
+    assert seen == ["feat: add ranking\n"]
 
 
 def test_pr_title_accepts_a_valid_title(monkeypatch: pytest.MonkeyPatch) -> None:

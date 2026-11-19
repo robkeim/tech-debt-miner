@@ -16,10 +16,12 @@ mattpocock
 modifyitems
 nodeid
 nosystem
+pyproject
 pytest
 pytestmark
 pythonpath
 robkeim
+shellcheck
 testpaths
 traveller
 venv

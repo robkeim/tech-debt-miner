@@ -23,7 +23,7 @@ def found(tool: str) -> str:
 def test_passing_step() -> None:
     calls: list[Sequence[str]] = []
 
-    def run(argv: Sequence[str]) -> int:
+    def run(argv: Sequence[str], _stdin: str | None) -> int:
         calls.append(argv)
         return 0
 
@@ -33,12 +33,14 @@ def test_passing_step() -> None:
 
 
 def test_failing_step_reports_the_exit_code() -> None:
-    result = run_step(Step("t", ("tool",)), run=lambda _argv: 3, resolve=found, ref_exists=any_ref)
+    result = run_step(
+        Step("t", ("tool",)), run=lambda _argv, _stdin: 3, resolve=found, ref_exists=any_ref
+    )
     assert result == Result("t", "fail", "exit 3")
 
 
 def test_missing_tool_fails_loudly() -> None:
-    def run(_argv: Sequence[str]) -> int:
+    def run(_argv: Sequence[str], _stdin: str | None) -> int:
         pytest.fail("must not run a missing tool")
 
     result = run_step(
@@ -48,9 +50,19 @@ def test_missing_tool_fails_loudly() -> None:
     assert "`cspell` is not installed" in result.detail
 
 
+def test_missing_helper_tool_fails_loudly() -> None:
+    def resolve(tool: str) -> str | None:
+        return None if tool == "shellcheck" else f"/bin/{tool}"
+
+    step = Step("actionlint", ("actionlint",), requires=("shellcheck",))
+    result = run_step(step, run=lambda _argv, _stdin: 0, resolve=resolve, ref_exists=any_ref)
+    assert result.status == "fail"
+    assert "`shellcheck` is not installed" in result.detail
+
+
 def test_missing_ref_fails_instead_of_skipping() -> None:
     step = Step("t", ("tool",), needs_ref="origin/main")
-    result = run_step(step, run=lambda _argv: 0, resolve=found, ref_exists=no_ref)
+    result = run_step(step, run=lambda _argv, _stdin: 0, resolve=found, ref_exists=no_ref)
     assert result.status == "fail"
     assert "origin/main not found" in result.detail
 
@@ -58,7 +70,7 @@ def test_missing_ref_fails_instead_of_skipping() -> None:
 def test_every_step_runs_after_a_failure_and_a_summary_prints() -> None:
     ran: list[str] = []
 
-    def run(argv: Sequence[str]) -> int:
+    def run(argv: Sequence[str], _stdin: str | None) -> int:
         ran.append(argv[0])
         return 1 if argv[0].endswith("first") else 0
 

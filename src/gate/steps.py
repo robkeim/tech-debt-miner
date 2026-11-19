@@ -24,9 +24,11 @@ _DIFF_COVER = Step(
     ),
     needs_ref=MAIN_REF,
 )
-_CSPELL_ALL = Step("cspell", ("cspell", "--no-progress", "--no-must-find-files", *SPELLCHECK_GLOBS))
+_CSPELL_ALL = Step(
+    "cspell", ("cspell", "--no-progress", "--no-must-find-files", "--dot", *SPELLCHECK_GLOBS)
+)
 _LYCHEE = Step("lychee", ("lychee", "--offline", "--include-fragments", "--no-progress", "**/*.md"))
-_ACTIONLINT = Step("actionlint", ("actionlint",))
+_ACTIONLINT = Step("actionlint", ("actionlint",), requires=("shellcheck",))
 _ZIZMOR = Step("zizmor", ("zizmor", "--offline", WORKFLOWS))
 
 FIX_STEPS = (

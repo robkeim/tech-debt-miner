@@ -7,8 +7,8 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from gate import repo
-from gate.commit_message import validate_message, validate_title
-from gate.runner import Result, exit_code, run_steps
+from gate.commit_message import strip_comments, validate_message, validate_title
+from gate.runner import Result, Step, exit_code, run_steps
 from gate.steps import FIX_STEPS, INSTALL_STEPS, fast_steps, full_steps
 
 PR_TITLE_ENV = "PR_TITLE"
@@ -35,8 +35,24 @@ def _report(errors: Sequence[str], subject: str) -> int:
     return 1
 
 
+def _spellcheck(message: str, root: Path) -> int:
+    """Spellcheck the message without git's comment lines, using the repo's cspell config.
+
+    The text goes in on stdin: cspell skips files outside the repo, so a temp file
+    would report "no files found" and check nothing.
+    """
+    step = Step(
+        "cspell (commit message)",
+        ("cspell", "--no-progress", "--config", str(root / "cspell.json"), "stdin"),
+        stdin=strip_comments(message) + "\n",
+    )
+    return exit_code(run_steps([step], ref_exists=lambda ref: repo.ref_exists(ref, root)))
+
+
 def _commit_msg(file: Path) -> int:
-    return _report(validate_message(file.read_text(encoding="utf-8")), "commit message")
+    message = file.read_text(encoding="utf-8")
+    rules = _report(validate_message(message), "commit message")
+    return max(rules, _spellcheck(message, Path.cwd()))
 
 
 def _pr_title() -> int:
