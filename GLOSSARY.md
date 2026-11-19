@@ -34,3 +34,7 @@ _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
 A Run that builds every prompt and estimates cost but makes no LLM calls.
+
+**Leakage test**:
+A test proving that nothing dated after the Cutoff date reaches a prompt or feature.
+_Avoid_: Cutoff test
