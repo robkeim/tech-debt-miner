@@ -52,7 +52,7 @@ PRs are squash-merged, so the PR title becomes the commit on `main`.
 
 ### Merge requirements
 
-Requirements this convention places on the repo settings (implementation tracked in the CI implementation issue):
+Requirements this convention places on the repo settings (implementation tracked in #22):
 
 - The PR title check is a required status check on `main`, with no admin bypass.
 - The title workflow also runs on the `edited` PR event, so fixing a title re-runs the check.
