@@ -130,7 +130,7 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 
 - CI runs the full gate from the workflow on `main`, so `--no-verify` only delays a failure.
 - Every ignore needs a rule code and reason (`PGH003`, `ANN401`, `reportUnnecessaryTypeIgnoreComment`).
-- A CI step fails a PR that edits gate config (ruff, pyright, pytest and coverage sections of `pyproject.toml`, the cspell config, the gate package, workflows) unless the PR body ticks "gate config changed". This makes weakening visible in review.
+- A CI step labels any PR that edits gate config (ruff, pyright, pytest and coverage sections of `pyproject.toml`, the cspell config but not its words list, the gate package, workflows) with `gate-config` and comments on it. It never fails the run; it makes weakening visible in review.
 - The agent-side deny list for `--no-verify` and config edits is decided in #12.
 
 ## CI and merge rules
