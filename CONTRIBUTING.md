@@ -182,7 +182,7 @@ CI runs the same gate as the hooks and adds nothing of its own to "green". Workf
 
 ### Required checks
 
-The `main` ruleset requires exactly `gate` and `pr-title`, with no bypass actors. "Require branches to be up to date" stays off. `pip-audit`, CodeQL, the labeler and the `mise` workflow are not required. Add the required checks to the ruleset only after both have reported once, so it never waits on a name that doesn't exist.
+The `main` ruleset requires exactly `gate` and `pr-title`, with no bypass actors. "Require branches to be up to date" is on: a PR must contain the latest `main` before it merges, so the checks run on exactly what lands. Parallel agent PRs make a stale green realistic; the cost is a rebase and a rerun after each merge, and stacked PRs need a rebase after their parent merges. `pip-audit`, CodeQL, the labeler and the `mise` workflow are not required. Add the required checks to the ruleset only after both have reported once, so it never waits on a name that doesn't exist.
 
 Repo settings: squash-merge only with default message "Pull request title" (already set), delete branch on merge on, auto-merge off.
 
