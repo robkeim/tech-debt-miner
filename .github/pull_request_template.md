@@ -13,3 +13,7 @@ Closes #
 ## Tradeoffs to check
 
 <!-- Choices where a reasonable alternative existed. Delete this section if there are none. -->
+
+## Gate
+
+- [ ] Gate config changed (ruff, pyright, pytest or coverage settings, cspell config, gate package, workflows)
