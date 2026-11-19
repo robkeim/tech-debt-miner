@@ -52,7 +52,7 @@ PRs are squash-merged, so the PR title becomes the commit on `main`.
 
 ### Merge requirements
 
-Requirements this convention places on the repo settings (set up in #11):
+Requirements this convention places on the repo settings (implementation tracked in the CI implementation issue):
 
 - The PR title check is a required status check on `main`, with no admin bypass.
 - The title workflow also runs on the `edited` PR event, so fixing a title re-runs the check.
@@ -124,7 +124,7 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 - **Output:** every step runs even after a failure. A pass/fail summary prints at the end and the exit code is nonzero if any step failed.
 - **`diff-cover` locally:** compares against the existing `origin/main` ref with no fetch. A stale ref is fine because CI recomputes it. A missing ref is a failure, not a skip.
 - **Non-Python tools:** `cspell`, `lychee` and `actionlint` are not in the `uv` environment and the repo has no `package.json`. They are pinned in `.tool-versions` (mise); run `mise install`. CI installs from the same file. The gate fails loudly when one is missing and never skips silently. `zizmor` and `pip-audit` are in the `dev` group.
-- **Tool freshness:** Dependabot can't read `.tool-versions`, so a weekly scheduled workflow (specified in #11) runs `mise outdated` and keeps one open issue labeled `tool-versions` up to date. It never fails the run. Bumps are manual PRs. GitHub pauses scheduled workflows after 60 days of repo inactivity; re-enable them in the Actions tab.
+- **Tool freshness:** Dependabot can't read `.tool-versions`, so a weekly scheduled workflow (see [CI and merge rules](#ci-and-merge-rules)) runs `mise outdated` and keeps one open issue labeled `tool-versions` up to date. It never fails the run. Bumps are manual PRs. GitHub pauses scheduled workflows after 60 days of repo inactivity; re-enable them in the Actions tab.
 
 ### Gate integrity
 
@@ -135,4 +135,39 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 
 ## CI and merge rules
 
-To be decided in #11.
+CI runs the same gate as the hooks and adds nothing of its own to "green". Workflows live in `.github/workflows/`.
+
+| Workflow | Triggers | Does |
+| --- | --- | --- |
+| `ci.yml` | `pull_request`, `push` to `main` | One `gate` job running `uv run gate`; a `gate-config` labeler job |
+| `pr-title.yml` | `pull_request` (`opened`, `edited`, `synchronize`, `reopened`) | `uv run gate pr-title` |
+| `security.yml` | `pull_request`, weekly | `pip-audit` |
+| `maintenance.yml` | weekly, `workflow_dispatch` | `mise outdated` issue |
+
+### Rules
+
+- **Triggers:** no path filters on required workflows, since a skipped required check stays pending. No `merge_group`; there is no merge queue. The push run on `main` is a post-merge sanity check.
+- **Gate job:** `ubuntu-latest`, one Python version from `.python-version`, no matrix, `fetch-depth: 0` so `diff-cover` can compare against `origin/main`. `timeout-minutes` on every job (15 for the gate).
+- **Caching:** `setup-uv` keyed on `uv.lock`; `mise-action` keyed on `.tool-versions`.
+- **Concurrency:** group `${{ github.workflow }}-${{ github.ref }}`; cancel in progress on PRs only, never on `main`.
+- **Permissions:** `permissions: {}` at the top of every workflow; each job grants only what it needs (`contents: read` for the gate, `pull-requests: write` for the labeler, `issues: write` for the `mise` job). `actions/checkout` uses `persist-credentials: false`.
+- **Pinning:** third-party actions are pinned to a full commit SHA with a version comment. Dependabot's `github-actions` ecosystem bumps them, with `chore(deps)` titles so they pass the title check.
+- **Title check:** the title reaches the script through an env var, never interpolated into `run:`.
+- **Forks and Dependabot:** CI holds no LLM key and tests never touch the network or LLM ([ADR 0003](docs/adr/0003-tests-never-touch-network-or-llm.md)), so fork and Dependabot PRs run the full gate and title check on plain `pull_request`. Never `pull_request_target` or `workflow_run`. The labeler is skipped for them, since their token is read-only; review covers that gap.
+
+### Required checks
+
+The `main` ruleset requires exactly `gate` and `pr-title`, with no bypass actors. "Require branches to be up to date" stays off. `pip-audit`, CodeQL, the labeler and the `mise` workflow are not required. Add the required checks to the ruleset only after both have reported once, so it never waits on a name that doesn't exist.
+
+Repo settings: squash-merge only with default message "Pull request title" (already set), delete branch on merge on, auto-merge off.
+
+### Scheduled jobs
+
+Both run Mondays at 06:00 UTC.
+
+- **`pip-audit`:** PR runs use `continue-on-error`, so findings show as annotations without blocking. The scheduled run fails on findings and GitHub emails the owner; no issue is filed.
+- **`mise outdated`:** looks for an open issue labeled `tool-versions` first and edits it in place; it creates one only when none is open, so it never piles up tickets. It closes the issue when nothing is outdated and never fails the run.
+
+### `gate-config` labeler
+
+Runs only on same-repo, non-Dependabot PRs. It matches the paths listed in [Gate integrity](#gate-integrity), adds the `gate-config` label (created once at setup) and posts one comment, found by a hidden marker and updated on later pushes. It never fails the run.
