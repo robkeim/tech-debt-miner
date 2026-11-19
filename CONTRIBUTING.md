@@ -67,6 +67,25 @@ Requirements this convention places on the repo settings (set up in #11):
 - **Issue templates:** `.github/ISSUE_TEMPLATE/` has bug and feature forms that apply `needs-triage`. Blank issues stay enabled for wayfinder tickets.
 - **Changelog and releases:** none for now. The commit history keeps that option open.
 
+## Security checks
+
+Most checks run on GitHub's side and add no gate runtime. [SECURITY.md](SECURITY.md) covers reporting.
+
+| Check | Where it runs | Blocking |
+| --- | --- | --- |
+| Secret scanning and push protection (validity checks on, non-provider patterns off) | GitHub | Push protection blocks the push |
+| CodeQL (Python, default setup, PRs plus weekly) | GitHub | No |
+| Dependabot alerts and security updates | GitHub | No |
+| `pip-audit` against `uv.lock` | CI only | PR runs report only; the weekly scheduled run fails |
+| `actionlint` and `zizmor` (offline, no token) | CI always; locally only when workflows change | Yes, part of the gate |
+
+Left out as redundant:
+
+- **gitleaks:** push protection covers provider-pattern secrets, and gitleaks is in maintenance mode.
+- **bandit:** ruff `ALL` includes the `S` rules.
+- **Semgrep:** overlaps CodeQL, sees one file at a time, and `semgrep ci` needs a login.
+- **OpenSSF Scorecard:** zizmor and the ruleset cover its useful checks.
+
 ## Gate and git hooks
 
 To be decided in #10.
