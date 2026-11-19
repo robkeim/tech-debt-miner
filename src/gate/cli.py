@@ -104,11 +104,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         case Mode.FAST:
             steps = fast_steps(repo.staged_files(root), root)
         case Mode.FULL:
-            steps = full_steps(
-                WorkflowLint.when(
-                    bool(os.environ.get("CI")) or repo.workflows_changed_since(repo.MAIN_REF, root)
-                )
-            )
+            workflows_changed = repo.workflows_changed_since(repo.MAIN_REF, root)
+            steps = full_steps(WorkflowLint.when(bool(os.environ.get("CI")) or workflows_changed))
     return exit_code(run_steps(steps, Environment(root)))
 
 
