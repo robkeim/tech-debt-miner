@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from gate.runner import mise_bin_paths, resolve_tool, run_argv
+from gate.tools import mise_bin_paths, resolve_tool, run_argv
 
 pytestmark = pytest.mark.integration
 

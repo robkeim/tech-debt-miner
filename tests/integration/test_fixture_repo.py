@@ -24,8 +24,8 @@ def test_same_commits_give_the_same_shas(tmp_path: Path) -> None:
 def test_identities_and_dates_are_fixed(tmp_path: Path) -> None:
     repo = build_fixture_repo(tmp_path / "repo", COMMITS)
     log = git(repo, "log", "--reverse", "--format=%an <%ae>|%cn <%ce>|%at|%ct|%s").splitlines()
-    author = f"{AUTHOR[0]} <{AUTHOR[1]}>"
-    committer = f"{COMMITTER[0]} <{COMMITTER[1]}>"
+    author = f"{AUTHOR.name} <{AUTHOR.email}>"
+    committer = f"{COMMITTER.name} <{COMMITTER.email}>"
     assert log == [
         f"{author}|{committer}|1577836800|1577836800|first",
         f"{author}|{committer}|1622505600|1622505600|second",
