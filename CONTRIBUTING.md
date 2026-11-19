@@ -101,7 +101,7 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 - **Property-based:** `hypothesis` only for scoring and ranking metrics, cutoff and date handling, and cache key stability. CI uses a derandomized profile.
 - **Order and clock:** `pytest-randomly` is always on and the seed is printed. An autouse fixture freezes the clock with `time-machine`; tests can override it.
 - **Coverage:** branch coverage with a global floor of 90% (`fail_under`) and a 90% diff-coverage gate on changed lines in CI (`diff-cover` against `origin/main`). `# pragma: no cover` needs a reason. The `--fast` gate skips both. 90 is a starting point to adapt; tests exist to catch regressions, so lower the number before writing a test just to hit it.
-- **Skips and flakes:** `skip` and `xfail` need a reason that links an issue, with `xfail_strict = true`. A flaky test is fixed or deleted; no retry plugins.
+- **Skips and flakes:** `skip`, `skipif` and `xfail` need a reason that links an issue (`#N` or an issue URL), with `xfail_strict = true`. A conftest collection hook fails the run otherwise, `skipif` platform skips included. A flaky test is fixed or deleted; no retry plugins.
 - **Config:** `filterwarnings = ["error"]` and `--durations=10` always on. No time limit; add a `slow` marker only if the suite gets slow.
 - **Writing tests:** every `feat` ships with tests and every `fix` with a regression test that fails before the fix. Review and the PR template's Evidence section check this; there is no automation. `tdd` is the recommended default for agents, not mandatory.
 - **Not adopted:** mutation testing, for now.
