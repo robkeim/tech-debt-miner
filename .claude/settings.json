@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env*)",
+      "Bash(gh pr merge:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git * --no-verify*)"
+    ],
+    "ask": [
+      "Edit(./pyproject.toml)",
+      "Edit(./cspell.*)",
+      "Edit(./.cspell.*)",
+      "Edit(./src/gate/**)",
+      "Edit(./.github/workflows/**)",
+      "Edit(./.claude/**)",
+      "Write(./pyproject.toml)",
+      "Write(./cspell.*)",
+      "Write(./.cspell.*)",
+      "Write(./src/gate/**)",
+      "Write(./.github/workflows/**)",
+      "Write(./.claude/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/block-dangerous-git.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
