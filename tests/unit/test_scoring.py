@@ -1,7 +1,6 @@
 import itertools
 import math
 
-import numpy as np
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -66,7 +65,7 @@ def test_k_must_be_positive() -> None:
     with pytest.raises(ValueError, match="k must"):
         scoring.ndcg_at_k_strict(["a"], labels, 0)
     with pytest.raises(ValueError, match="k must"):
-        scoring.ideal_dcg_at_k({"a": 1}, 0)
+        scoring.ideal_dcg_at_k(labels, 0)
 
 
 def test_perfect_ranking_scores_one() -> None:
@@ -160,9 +159,9 @@ def test_matches_scikit_learn_ndcg_score_on_complete_rankings(
     # The oracle agrees where every file is ranked: same discount, tie averaging by default.
     groups, labels, k = case
     flat = [p for g in groups for p in g]
-    scores = np.array([[float(len(groups) - i) for i, g in enumerate(groups) for _ in g]])
-    damped = np.array([[scoring.gain(labels.counts[p]) for p in flat]])
-    if damped.max() == 0.0:
+    scores = [[float(len(groups) - i) for i, g in enumerate(groups) for _ in g]]
+    damped = [[scoring.gain(labels.counts[p]) for p in flat]]
+    if max(damped[0]) == 0.0:
         assert scoring.ndcg_at_k(groups, labels, k) == 0.0
         return
     expected = float(ndcg_score(damped, scores, k=k, ignore_ties=False))
@@ -206,4 +205,4 @@ def test_an_empty_group_takes_no_slot() -> None:
 
 def test_dcg_rejects_a_non_positive_k() -> None:
     with pytest.raises(ValueError, match="k must"):
-        scoring.dcg_at_k([["a"]], {"a": 1}, 0)
+        scoring.dcg_at_k([["a"]], Labels(counts={"a": 1}), 0)
