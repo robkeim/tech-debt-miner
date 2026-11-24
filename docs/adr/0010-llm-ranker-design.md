@@ -1,6 +1,6 @@
 # The LLM ranker is a two-stage listwise ranker that never sees the baseline
 
-Accepted. Decided in #38. It supplies the `Ranker` protocol that ADR 0009 (PR #61) leaves open, and re-checks the file-count bounds that [ADR 0006](0006-target-repos-and-cutoff-dates.md) marks "provisional until #38": they stand (see the Triage set row). Scoring is [ADR 0005](0005-scoring-pre-registration.md); the LLM client's rules are [ADR 0002](0002-single-llm-client-choke-point.md).
+Accepted. Decided in #38. It supplies the `Ranker` protocol that [ADR 0009](0009-code-layout-and-core-types.md) leaves open, and re-checks the file-count bounds that [ADR 0006](0006-target-repos-and-cutoff-dates.md) marks "provisional until #38": they stand (see the Triage set row). Scoring is [ADR 0005](0005-scoring-pre-registration.md); the LLM client's rules are [ADR 0002](0002-single-llm-client-choke-point.md).
 
 The ranker asks the model for one ordered list of files, in two calls: a triage over a digest of every eligible file, then a ranking of the resulting Triage set with code and history. Everything it sees is read from the Pinned SHA and from history before the Cutoff date.
 
@@ -22,7 +22,7 @@ Like ADR 0005 and ADR 0007, this ADR is frozen before any scored Run, and a chan
 | Baseline-blind | No churn count, complexity number or Baseline ranking reaches a prompt. |
 | Input type | `rank` takes only a `Snapshot`, never a repo path or git handle, so it cannot reach data after the Cutoff date. |
 | Protocol | `rank(snapshot, *, repeat) -> Ranking`. The Baseline implements it and ignores `repeat`. The LLM ranker gets the client injected at construction. Rationales and the Triage set go to the client's per-call log, not into `Ranking`. A failed schema retry raises `RankFailed`. |
-| Run and cap | A Run is ADR 0008's unit: one (Target repo, Cutoff date) pair with the Baseline and 3 LLM repeats, each repeat running both stages. `--max-usd` caps the Run's total spend and defaults to $4, which is about 1.8x the estimated cost of the largest repo. It is raised only via `--max-usd`. |
+| Run and cap | A Run is [ADR 0008](0008-pipeline-stages-artifacts-and-resume.md)'s unit: one (Target repo, Cutoff date) pair with the Baseline and 3 LLM repeats, each repeat running both stages. `--max-usd` caps the Run's total spend and defaults to $4, which is about 1.8x the estimated cost of the largest repo. It is raised only via `--max-usd`. |
 | Cap behavior | A Run whose Dry-run estimate exceeds the cap does not start. A Run that crosses the cap mid-way stops and stays resumable with a higher `--max-usd` (ADR 0008). |
 | Malformed output | One retry with the validation error appended, as ADR 0008 specifies; both calls are logged and billed, and the `attempt` index keeps them apart in the cache. A second failure makes `rank` fail loudly and the Run stays resumable. A failed ranking is never scored as zero. Duplicates and nonexistent paths are left to ADR 0005's rules. |
 | Cache key | ADR 0008 already keys the Response cache on the request, the repeat and the attempt, so the three repeats are not collapsed into one response. Nothing changes here. |
