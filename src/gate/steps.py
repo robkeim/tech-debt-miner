@@ -14,6 +14,7 @@ DIFF_COVER_FLOOR = "90"
 _FORMAT = Step("ruff format", ("ruff", "format", "--check", "."))
 _LINT = Step("ruff check", ("ruff", "check", "."))
 _PYRIGHT = Step("pyright", ("pyright",))
+_ADR_NUMBERS = Step("adr numbers", ("pytest", "tests/policy/test_adr_numbers.py"))
 _TESTS = Step("pytest", ("pytest", "--cov", "--cov-report=xml"))
 _DIFF_COVER = Step(
     "diff-cover",
@@ -63,7 +64,7 @@ def _is_workflow(path: str) -> bool:
 def fast_steps(staged: Sequence[str], root: Path) -> list[Step | Skipped]:
     """Return the pre-commit hook steps. Spelling covers staged files only."""
     spellable = [path for path in staged if path.endswith(SPELLCHECKED) and (root / path).is_file()]
-    steps: list[Step | Skipped] = [_FORMAT, _LINT, _PYRIGHT]
+    steps: list[Step | Skipped] = [_FORMAT, _LINT, _PYRIGHT, _ADR_NUMBERS]
     if spellable:
         steps.append(Step("cspell", ("cspell", "--no-progress", *spellable)))
     else:
