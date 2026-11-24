@@ -38,7 +38,7 @@ def run_id(manifest: Manifest, now: datetime) -> str:
 
 
 def _manifest_text(manifest: Manifest) -> str:
-    return store.canonical_json(store.manifest_to_json(manifest))
+    return store.canonical_json(store.to_json(manifest))
 
 
 class RunDir:
@@ -101,13 +101,13 @@ class RunDir:
         return store.manifest_from_json(store.read_json(self.manifest_path))
 
     def write_snapshot(self, snapshot: Snapshot) -> None:
-        store.write_json(self.snapshot_path, store.snapshot_to_json(snapshot))
+        store.write_json(self.snapshot_path, store.to_json(snapshot))
 
     def read_snapshot(self) -> Snapshot:
         return store.snapshot_from_json(store.read_json(self.snapshot_path))
 
     def append_request(self, request: Request) -> None:
-        store.append_jsonl(self.requests_path, store.request_to_json(request))
+        store.append_jsonl(self.requests_path, store.to_json(request))
 
     def read_requests(self) -> list[Request]:
         return [store.request_from_json(row) for row in store.read_jsonl(self.requests_path)]
@@ -120,7 +120,7 @@ class RunDir:
 
     def write_ranking(self, ranking: Ranking) -> None:
         path = self.ranking_path(ranking.ranker, ranking.repeat)
-        store.write_json(path, store.ranking_to_json(ranking))
+        store.write_json(path, store.to_json(ranking))
 
     def read_ranking(self, ranker: str, repeat: int) -> Ranking:
         return store.ranking_from_json(store.read_json(self.ranking_path(ranker, repeat)))
@@ -135,7 +135,7 @@ class RunDir:
         return dict(store.read_json(self.cost_path))
 
     def write_labels(self, labels: Labels) -> None:
-        store.write_json(self.labels_path, store.labels_to_json(labels))
+        store.write_json(self.labels_path, store.to_json(labels))
 
     def read_labels(self) -> Labels:
         return store.labels_from_json(store.read_json(self.labels_path))
@@ -146,7 +146,7 @@ class RunDir:
         if path.exists():
             msg = f"{path.name} already exists; scores are never overwritten"
             raise FileExistsError(msg)
-        store.write_json(path, store.scores_to_json(scores))
+        store.write_json(path, store.to_json(scores))
 
     def read_scores(self, scoring_date: str) -> Scores:
         return store.scores_from_json(store.read_json(self.scores_path(scoring_date)))

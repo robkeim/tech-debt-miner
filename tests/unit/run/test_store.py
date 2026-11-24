@@ -49,7 +49,7 @@ def test_snapshot_round_trip() -> None:
         files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
         issues=(Issue(number=1, title="t", body="b"),),
     )
-    assert store.snapshot_from_json(store.snapshot_to_json(snapshot)) == snapshot
+    assert store.snapshot_from_json(store.to_json(snapshot)) == snapshot
 
 
 def test_request_ranking_labels_scores_round_trip() -> None:
@@ -57,7 +57,7 @@ def test_request_ranking_labels_scores_round_trip() -> None:
     ranking = Ranking("llm", 2, ("a.py", "b.py"))
     labels = Labels({"a.py": 3})
     scores = Scores({"ndcg": 0.5})
-    assert store.request_from_json(store.request_to_json(request)) == request
-    assert store.ranking_from_json(store.ranking_to_json(ranking)) == ranking
-    assert store.labels_from_json(store.labels_to_json(labels)) == labels
-    assert store.scores_from_json(store.scores_to_json(scores)) == scores
+    assert store.request_from_json(store.to_json(request)) == request
+    assert store.ranking_from_json(store.to_json(ranking)) == ranking
+    assert store.labels_from_json(store.to_json(labels)) == labels
+    assert store.scores_from_json(store.to_json(scores)) == scores

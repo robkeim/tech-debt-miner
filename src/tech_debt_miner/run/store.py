@@ -9,7 +9,10 @@ import tempfile
 from collections.abc import Mapping
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from _typeshed import DataclassInstance
 
 from tech_debt_miner.types import (
     FileFacts,
@@ -79,8 +82,9 @@ def read_jsonl(path: Path) -> list[Any]:
     return [json.loads(line) for line in complete if line]
 
 
-def manifest_to_json(manifest: Manifest) -> dict[str, Any]:
-    return asdict(manifest)
+def to_json(obj: DataclassInstance) -> dict[str, Any]:
+    """Return the JSON-ready dict for any core type. Decoding stays explicit per type."""
+    return asdict(obj)
 
 
 def manifest_from_json(data: Mapping[str, Any]) -> Manifest:
@@ -98,10 +102,6 @@ def manifest_from_json(data: Mapping[str, Any]) -> Manifest:
     )
 
 
-def snapshot_to_json(snapshot: Snapshot) -> dict[str, Any]:
-    return asdict(snapshot)
-
-
 def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
     return Snapshot(
         files=tuple(FileFacts(**file) for file in data["files"]),
@@ -109,32 +109,16 @@ def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
     )
 
 
-def request_to_json(request: Request) -> dict[str, Any]:
-    return asdict(request)
-
-
 def request_from_json(data: Mapping[str, Any]) -> Request:
     return Request(**data)
-
-
-def ranking_to_json(ranking: Ranking) -> dict[str, Any]:
-    return asdict(ranking)
 
 
 def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
     return Ranking(ranker=data["ranker"], repeat=data["repeat"], paths=tuple(data["paths"]))
 
 
-def labels_to_json(labels: Labels) -> dict[str, Any]:
-    return asdict(labels)
-
-
 def labels_from_json(data: Mapping[str, Any]) -> Labels:
     return Labels(counts=dict(data["counts"]))
-
-
-def scores_to_json(scores: Scores) -> dict[str, Any]:
-    return asdict(scores)
 
 
 def scores_from_json(data: Mapping[str, Any]) -> Scores:
