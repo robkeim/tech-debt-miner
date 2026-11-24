@@ -20,14 +20,17 @@ from tech_debt_miner.run.artifacts import (
 )
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, RunState, Stage, run_id
 from tech_debt_miner.types import (
+    CapResult,
     FileFacts,
     Issue,
     Labels,
     Manifest,
     Ranking,
     Request,
+    ReviewItem,
     Scores,
     Snapshot,
+    Validation,
 )
 
 pytestmark = pytest.mark.unit
@@ -107,6 +110,18 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
     "responses": ({"text": "hi"}, None),
     "cost": ({"usd": 1.5}, None),
     "labels": (Labels({"a.py": 1}), None),
+    "validation": (
+        Validation(
+            cap_n=3,
+            fix_commits_sized=10,
+            cap_report=(CapResult(3, 1, 4, 9), CapResult(None, 0, 5, 12)),
+            sample_seed=7,
+            sample=(ReviewItem("s" * 40, "fix a", ("#1",), ("a.py",), " a.py | 1 +"),),
+            clone_head="h" * 40,
+            fetched=True,
+        ),
+        None,
+    ),
     "ranking": (Ranking("llm", 1, ("a.py",)), ("llm", 1)),
     "scores": (Scores({"m": 0.1}), "2027-01-31"),
 }

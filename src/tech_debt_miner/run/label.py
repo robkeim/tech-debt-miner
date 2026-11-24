@@ -7,7 +7,7 @@ from pathlib import Path
 
 from tech_debt_miner import labels
 from tech_debt_miner.repo import git
-from tech_debt_miner.repo.history import GitError
+from tech_debt_miner.repo.history import CommitChange, GitError
 from tech_debt_miner.run.artifacts import LABELS, MANIFEST
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import Labels
@@ -32,18 +32,23 @@ class LabelDeps:
     max_files: int | None = None  # the fix-size cap N; None is uncapped
 
 
-def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
-    """Write `labels.json` for the Run, or raise `WindowOpenError` while the window is open.
+@dataclass(frozen=True)
+class LabelWindow:
+    """What the Label window holds: the clone and its non-merge commits, newest first."""
+
+    clone: Path
+    commits: list[CommitChange]
+    cutoff_files: list[str]  # every path in the tree at the Pinned SHA
+
+
+def read_window(run_dir: RunDir, deps: LabelDeps) -> LabelWindow:
+    """Read the closed Label window, fast-forwarding the clone first unless told not to.
 
     The window is `(Cutoff date, Cutoff date + 6 months]` by date. It starts the day after the
     Cutoff date and ends after its last day, so it can never include a commit the as-of
-    functions return, and the Cutoff day itself is in neither. Labels are scoring input only and
-    never reach a prompt. The clone is fast-forwarded first unless `update_clone` is None, and
-    `labels.json` records the clone's HEAD, its newest commit date and whether an update ran.
+    functions return, and the Cutoff day itself is in neither. Raises `WindowOpenError` while
+    the window is open and `CloneUpdateError` when the clone cannot be fast-forwarded.
     """
-    if run_dir.exists(LABELS):
-        msg = f"{LABELS.path(None)} already exists; N is fixed before any scored Run"
-        raise FileExistsError(msg)
     manifest = run_dir.read(MANIFEST)
     cutoff = date.fromisoformat(manifest.cutoff_date)
     today = deps.clock().date()
@@ -60,13 +65,24 @@ def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
     commits = git.list_commits(
         clone, labels.window_start(cutoff), labels.window_end(cutoff) + timedelta(days=1)
     )
-    result = labels.build_labels(
-        commits, git.list_files(clone, manifest.pinned_sha), deps.max_files
-    )
+    return LabelWindow(clone, commits, git.list_files(clone, manifest.pinned_sha))
+
+
+def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
+    """Write `labels.json` for the Run, or raise `WindowOpenError` while the window is open.
+
+    Labels are scoring input only and never reach a prompt. `labels.json` records the clone's
+    HEAD, its newest commit date and whether an update ran (see `read_window`).
+    """
+    if run_dir.exists(LABELS):
+        msg = f"{LABELS.path(None)} already exists; N is fixed before any scored Run"
+        raise FileExistsError(msg)
+    window = read_window(run_dir, deps)
+    result = labels.build_labels(window.commits, window.cutoff_files, deps.max_files)
     result = replace(
         result,
-        clone_head=git.head_sha(clone),
-        clone_newest_commit=git.head_committed_at(clone).isoformat(),
+        clone_head=git.head_sha(window.clone),
+        clone_newest_commit=git.head_committed_at(window.clone).isoformat(),
         fetched=deps.update_clone is not None,
     )
     run_dir.write(LABELS, result)

@@ -77,6 +77,40 @@ class Labels:
 
 
 @dataclass(frozen=True)
+class CapResult:
+    """The Label's outcome under one fix-size cap; `max_files` None is uncapped."""
+
+    max_files: int | None
+    fix_commits_dropped: int
+    files_labeled: int  # files with a Label of 1 or more
+    label_total: int  # sum of every file's Label
+
+
+@dataclass(frozen=True)
+class ReviewItem:
+    """One row of the review sheet: a sampled Fix commit as a reviewer needs to see it."""
+
+    sha: str
+    message: str
+    issue_references: tuple[str, ...]  # `#N` or `/issues/N` found in the message, PR suffix aside
+    files: tuple[str, ...]  # Eligible files the commit touches
+    diff_stat: str  # `git show --stat` output
+
+
+@dataclass(frozen=True)
+class Validation:
+    """The ADR 0004 pre-run checks: the fix-size cap N, its sensitivity, the review sample."""
+
+    cap_n: int | None  # 90th percentile of fix sizes; None when no Fix commit touches a source file
+    fix_commits_sized: int  # Fix commits that touch at least one Eligible file
+    cap_report: tuple[CapResult, ...]  # N first (when set), then N = 5, 10, 20 and uncapped
+    sample_seed: int
+    sample: tuple[ReviewItem, ...]
+    clone_head: str
+    fetched: bool
+
+
+@dataclass(frozen=True)
 class Scores:
     metrics: Mapping[str, float]  # metric name -> value
 
