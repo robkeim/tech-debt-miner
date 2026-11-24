@@ -83,7 +83,7 @@ class FakeHTTP:
             return httpx2.Response(self.status, json=self.body, headers={"request-id": "req_abc"})
 
         http_client = httpx2.Client(transport=httpx2.MockTransport(handle))
-        return AnthropicTransport(KEY, http_client=http_client, max_retries=0, **options)
+        return AnthropicTransport(KEY, http_client=http_client, **options)
 
 
 def test_client_returns_the_response_and_tracks_spend() -> None:
@@ -209,3 +209,112 @@ def test_missing_key_fails_loudly(tmp_path: Path) -> None:
         load_api_key({}, tmp_path / "absent.env")
     with pytest.raises(MissingKeyError):
         load_api_key({}, None)
+
+
+WORST_CASE = (((len("sys") + len("hello")) // 3 + 1) * 2 + 100 * 10) / 1e6  # for `request()`
+
+
+class Script:
+    """A transport that replays a list of replies, one per send."""
+
+    def __init__(self, *replies: Response | Exception) -> None:
+        self.replies = list(replies)
+        self.sent = 0
+
+    def send(self, request: Request, schema: Mapping[str, object] | None) -> Response:  # noqa: ARG002 - Transport signature
+        self.sent += 1
+        reply = self.replies.pop(0)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
+
+
+def test_transient_errors_are_retried_with_backoff_and_every_try_is_logged() -> None:
+    log: list[Mapping[str, object]] = []
+    sleeps: list[float] = []
+    script = Script(
+        ProviderError("429", transient=True), ProviderError("503", transient=True), response()
+    )
+    client = LLMClient(script, max_usd=1.0, log=log.append, sleep=sleeps.append)
+    assert client.complete(request()) == response()
+    assert sleeps == [1.0, 2.0]
+    assert [record["try"] for record in log] == [1, 2, 3]
+    assert [record["cost_usd"] for record in log[:2]] == [WORST_CASE, WORST_CASE]
+    assert client.spent_usd == pytest.approx(2 * WORST_CASE + 0.007)
+
+
+def test_backoff_is_capped() -> None:
+    sleeps: list[float] = []
+    errors = [ProviderError("5xx", transient=True) for _ in range(6)]
+    client = LLMClient(Script(*errors), max_usd=1.0, max_attempts=6, sleep=sleeps.append)
+    with pytest.raises(ProviderError):
+        client.complete(request())
+    assert sleeps == [1.0, 2.0, 4.0, 8.0, 8.0]
+
+
+def test_client_gives_up_after_max_attempts_and_charges_each_reserved_cost() -> None:
+    script = Script(*[ProviderError("down", transient=True) for _ in range(3)])
+    client = LLMClient(script, max_usd=1.0, sleep=lambda _seconds: None)
+    with pytest.raises(ProviderError):
+        client.complete(request())
+    assert script.sent == 3
+    assert client.spent_usd == pytest.approx(3 * WORST_CASE)
+
+
+def test_permanent_errors_are_not_retried() -> None:
+    script = Script(ProviderError("billed but permanent"))
+    client = LLMClient(script, max_usd=1.0, sleep=lambda _seconds: None)
+    with pytest.raises(ProviderError):
+        client.complete(request())
+    assert script.sent == 1
+    assert client.spent_usd == pytest.approx(WORST_CASE)
+
+
+def test_an_error_that_proves_nothing_was_billed_costs_nothing() -> None:
+    client = LLMClient(Script(ProviderError("400", billed=False)), max_usd=1.0)
+    with pytest.raises(ProviderError):
+        client.complete(request())
+    assert client.spent_usd == 0
+
+
+def test_a_retry_that_would_cross_the_cap_is_refused() -> None:
+    script = Script(ProviderError("down", transient=True), response())
+    client = LLMClient(script, max_usd=1.5 * WORST_CASE, sleep=lambda _seconds: None)
+    with pytest.raises(CapExceededError):
+        client.complete(request())
+    assert script.sent == 1
+    assert client.spent_usd <= 1.5 * WORST_CASE
+
+
+def test_dry_run_failure_is_logged_but_costs_nothing_and_is_not_retried() -> None:
+    log: list[Mapping[str, object]] = []
+    client = LLMClient(DryRunTransport(), max_usd=1.0, log=log.append)
+    with pytest.raises(DryRunError):
+        client.complete(request())
+    assert len(log) == 1
+    assert client.spent_usd == 0
+
+
+@pytest.mark.parametrize(
+    ("status", "transient", "billed"),
+    [(429, True, True), (500, True, True), (529, True, True), (400, False, False)],
+)
+def test_http_statuses_map_to_retry_and_billing_flags(
+    status: int, *, transient: bool, billed: bool
+) -> None:
+    fake = FakeHTTP(status, {"type": "error", "error": {"type": "x", "message": "m"}})
+    with pytest.raises(ProviderError) as caught:
+        fake.transport().send(request(), None)
+    assert (caught.value.transient, caught.value.billed) == (transient, billed)
+    assert len(fake.sent) == 1  # the SDK does not retry on its own
+
+
+def test_connection_errors_are_transient_and_possibly_billed() -> None:
+    def refuse(_request: httpx2.Request) -> httpx2.Response:
+        msg = "refused"
+        raise httpx2.ConnectError(msg)
+
+    http_client = httpx2.Client(transport=httpx2.MockTransport(refuse))
+    with pytest.raises(ProviderError) as caught:
+        AnthropicTransport(KEY, http_client=http_client).send(request(), None)
+    assert (caught.value.transient, caught.value.billed) == (True, True)

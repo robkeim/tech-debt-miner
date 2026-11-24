@@ -7,6 +7,7 @@ raises on send, not a flag.
 """
 
 import re
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,6 +20,11 @@ from tech_debt_miner.types import Request, Response
 
 DEFAULT_MAX_USD = 4.0  # ADR 0010; raised only via `--max-usd`
 KEY_VARIABLE = "ANTHROPIC_API_KEY"
+TRANSIENT_STATUSES = frozenset({408, 409, 429})
+HTTP_SERVER_ERROR = 500
+MAX_ATTEMPTS = 3
+BACKOFF_BASE_SECONDS = 1.0
+BACKOFF_MAX_SECONDS = 8.0
 CHARS_PER_TOKEN = 3  # conservative: overestimates tokens, so the cap check errs toward stopping
 REDACTED = "[REDACTED]"
 _KEY_PATTERN = re.compile(r"sk-ant-[A-Za-z0-9_-]+")
@@ -56,7 +62,17 @@ class MissingKeyError(LLMError):
 
 
 class ProviderError(LLMError):
-    """The provider call failed. The message is already redacted."""
+    """The provider call failed. The message is already redacted.
+
+    `transient` errors (rate limits, 5xx, dropped connections) are retried by the client.
+    `billed` is False only when the error proves the provider rejected the call before
+    generating anything; otherwise the attempt is accounted at its reserved cost.
+    """
+
+    def __init__(self, message: str, *, transient: bool = False, billed: bool = True) -> None:
+        super().__init__(message)
+        self.transient = transient
+        self.billed = billed
 
 
 class Transport(Protocol):
@@ -108,11 +124,10 @@ class AnthropicTransport:
         http_client: httpx2.Client | None = None,
         thinking: Literal["off", "adaptive"] = "off",
         effort: Literal["low", "medium", "high"] = "high",
-        max_retries: int = 2,
     ) -> None:
-        self._sdk = anthropic.Anthropic(
-            api_key=api_key, http_client=http_client, max_retries=max_retries
-        )
+        # The SDK's own retries are off: every attempt must go through `LLMClient`, which
+        # checks the cap and logs it (ADR 0014).
+        self._sdk = anthropic.Anthropic(api_key=api_key, http_client=http_client, max_retries=0)
         self._thinking = thinking
         self._effort: Literal["low", "medium", "high"] = effort
         self._secrets = (api_key,)
@@ -138,7 +153,7 @@ class AnthropicTransport:
                 output_config=output_config,
             )
         except anthropic.APIError as error:
-            raise ProviderError(redact(f"{type(error).__name__}: {error}", self._secrets)) from None
+            raise self._provider_error(error) from None
         return Response(
             text="".join(block.text for block in message.content if block.type == "text"),
             input_tokens=message.usage.input_tokens,
@@ -148,11 +163,21 @@ class AnthropicTransport:
             model=message.model,
         )
 
+    def _provider_error(self, error: anthropic.APIError) -> ProviderError:
+        text = redact(f"{type(error).__name__}: {error}", self._secrets)
+        if isinstance(error, anthropic.APIStatusError):
+            status = error.status_code
+            transient = status in TRANSIENT_STATUSES or status >= HTTP_SERVER_ERROR
+            # A 4xx other than 408, 409 and 429 is rejected before generation: nothing billed.
+            return ProviderError(text, transient=transient, billed=transient)
+        # Connection errors and timeouts: the call may have been generated and billed.
+        return ProviderError(text, transient=True)
+
 
 class LLMClient:
-    """Enforces the USD cap and logs every call around a `Transport`."""
+    """Enforces the USD cap, retries transient errors and logs every attempt."""
 
-    def __init__(
+    def __init__(  # noqa: PLR0913 - keyword-only options with defaults
         self,
         transport: Transport,
         *,
@@ -160,6 +185,8 @@ class LLMClient:
         log: Callable[[Mapping[str, object]], None] = lambda _record: None,
         secrets: tuple[str, ...] = (),
         spent_usd: float = 0.0,
+        max_attempts: int = MAX_ATTEMPTS,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         if max_usd <= 0:
             msg = "max_usd must be positive"
@@ -168,6 +195,8 @@ class LLMClient:
         self._max_usd = max_usd
         self._log = log
         self._secrets = secrets
+        self._max_attempts = max_attempts
+        self._sleep = sleep
         self.spent_usd = spent_usd  # seed from cost.json when resuming a Run
 
     def complete(self, request: Request, schema: Mapping[str, object] | None = None) -> Response:
@@ -180,25 +209,39 @@ class LLMClient:
             (len(request.system) + len(request.prompt)) // CHARS_PER_TOKEN + 1,
             request.max_tokens,
         )
-        if self.spent_usd + worst_case > self._max_usd:
-            msg = (
-                f"spent ${self.spent_usd:.2f} plus worst case ${worst_case:.2f} "
-                f"exceeds the ${self._max_usd:.2f} cap; raise it with --max-usd"
-            )
-            raise CapExceededError(msg)
-        try:
-            response = self._transport.send(request, schema)
-        except LLMError as error:
-            self._record(request, error=redact(str(error), self._secrets))
-            raise
-        cost = _cost(price, response.input_tokens, response.output_tokens)
-        self.spent_usd += cost
-        self._record(request, response=response, cost=cost)
-        return response
+        for attempt in range(1, self._max_attempts + 1):
+            # Reserve the worst case before every attempt, retries included, so a billed
+            # failure can never push spend past the cap.
+            if self.spent_usd + worst_case > self._max_usd:
+                msg = (
+                    f"spent ${self.spent_usd:.2f} plus worst case ${worst_case:.2f} "
+                    f"exceeds the ${self._max_usd:.2f} cap; raise it with --max-usd"
+                )
+                raise CapExceededError(msg)
+            try:
+                response = self._transport.send(request, schema)
+            except ProviderError as error:
+                cost = worst_case if error.billed else 0.0
+                self.spent_usd += cost
+                self._record(request, attempt, cost=cost, error=redact(str(error), self._secrets))
+                if not error.transient or attempt == self._max_attempts:
+                    raise
+                self._sleep(min(BACKOFF_BASE_SECONDS * 2 ** (attempt - 1), BACKOFF_MAX_SECONDS))
+                continue
+            except LLMError as error:
+                self._record(request, attempt, error=redact(str(error), self._secrets))
+                raise
+            cost = _cost(price, response.input_tokens, response.output_tokens)
+            self.spent_usd += cost
+            self._record(request, attempt, response=response, cost=cost)
+            return response
+        msg = "max_attempts must be at least 1"
+        raise ValueError(msg)
 
     def _record(
         self,
         request: Request,
+        attempt: int,
         *,
         response: Response | None = None,
         cost: float = 0.0,
@@ -208,6 +251,7 @@ class LLMClient:
             "ranker": request.ranker,
             "repeat": request.repeat,
             "attempt": request.attempt,
+            "try": attempt,
             "model": request.model,
             "cost_usd": cost,
             "spent_usd": self.spent_usd,
