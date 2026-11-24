@@ -23,7 +23,7 @@ class GitError(RuntimeError):
 
 @dataclass(frozen=True)
 class FileChange:
-    """One path touched by a commit. `old_path` is set only when the file was renamed or copied."""
+    """One path touched by a commit. `old_path` is set only when the file was renamed."""
 
     path: str
     old_path: str | None = None
@@ -109,7 +109,7 @@ def list_commits(repo: Path, since: date, until: date) -> list[CommitChange]:
 
 def _file_change(line: str) -> FileChange:
     status, *paths = line.split("\t")
-    if status[0] in "RC":
+    if status.startswith("R"):
         return FileChange(path=paths[1], old_path=paths[0])
     return FileChange(path=paths[0])
 

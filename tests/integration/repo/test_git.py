@@ -104,7 +104,10 @@ def test_export_tree_writes_the_tree_and_cleans_up(repo: Path) -> None:
 
 
 def test_nothing_after_the_cutoff_date_is_returned(repo: Path) -> None:
-    """The first Leakage test: the poison marker never appears in any as-of output."""
+    """Git-level slice of the Leakage test: the poison marker never appears in as-of output.
+
+    The policy-tier Leakage test (Dry-run path, filter-disabled check) comes with later slices.
+    """
     pinned = repo_git.resolve_pinned_sha(repo, CUTOFF)
     commits = repo_git.list_commits(repo, date(2000, 1, 1), CUTOFF)
     assert all(c.committed_at.date() < CUTOFF for c in commits)
