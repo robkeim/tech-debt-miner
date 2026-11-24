@@ -4,7 +4,7 @@ Accepted. Decided in #72. Relaxes two rules of [ADR 0009](0009-code-layout-and-c
 
 ## Decisions
 
-- **Leaf imports.** A leaf module (pure functions over plain data, such as `labels.py` and `scoring.py`) may import `types` and the pure `repo` modules: `repo/history.py`, `repo/cutoff.py` and `repo/eligibility.py`. It never imports `repo/git.py` or anything else that runs a subprocess. `tests/policy/test_layering.py` enforces this for the leaf modules that conform today; add a module to its list when it becomes a leaf.
+- **Leaf imports.** A leaf module (pure functions over plain data, such as `labels.py` and `scoring.py`) may import `types` and the pure `repo` modules: `repo/history.py`, `repo/cutoff.py` and `repo/eligibility.py`. It imports nothing else from the package, in particular never `repo/git.py` or anything that runs a subprocess. `tests/policy/test_layering.py` enforces this for the leaf modules that conform today; add a module to its list when it becomes a leaf.
 - **Clone updates.** ADR 0009 treats a Target repo clone as read-only after the first clone. The `label` stage now fast-forwards the clone before reading it: `git fetch`, then `git merge --ff-only` on the upstream branch, through an injected runner. If that fails, for example because upstream history was rewritten, the stage refuses and writes nothing. `--no-fetch` skips the update for offline use. `labels.json` records the clone's HEAD SHA, its newest commit date and whether an update ran, so the source of every Label is visible.
 
 ## Why
