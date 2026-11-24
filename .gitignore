@@ -230,3 +230,6 @@ coverage.xml
 
 # Target repo clones (read-only, ADR 0009)
 repos/
+
+# Run directories (ADR 0008)
+runs/

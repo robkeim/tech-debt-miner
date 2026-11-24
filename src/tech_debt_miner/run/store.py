@@ -94,6 +94,7 @@ def manifest_from_json(data: Mapping[str, Any]) -> Manifest:
         cutoff_date=data["cutoff_date"],
         model=data["model"],
         model_training_cutoff=data["model_training_cutoff"],
+        cutoff_minus_training_days=data["cutoff_minus_training_days"],
         repeats=data["repeats"],
         prompt_hashes=dict(data["prompt_hashes"]),
         lizard_version=data["lizard_version"],
