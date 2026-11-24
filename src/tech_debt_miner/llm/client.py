@@ -79,7 +79,7 @@ def load_api_key(env: Mapping[str, str], dotenv: Path | None = None) -> str:
         return key
     if dotenv is not None and dotenv.is_file():
         for line in dotenv.read_text(encoding="utf-8").splitlines():
-            name, sep, value = line.strip().partition("=")
+            name, sep, value = line.strip().removeprefix("export ").partition("=")
             if sep and name.strip() == KEY_VARIABLE and (key := value.strip().strip("\"'")):
                 return key
     msg = f"{KEY_VARIABLE} is not set in the environment or .env"
@@ -123,6 +123,8 @@ class AnthropicTransport:
         output_config: anthropic.types.OutputConfigParam = {"effort": self._effort}
         if schema is not None:
             output_config["format"] = {"type": "json_schema", "schema": dict(schema)}
+        # Sonnet 5.5 rejects `{"type": "disabled"}`; `between_tools` is how thinking is off
+        # (ADR 0010).
         thinking: anthropic.types.ThinkingConfigParam = (
             {"type": "adaptive"} if self._thinking == "adaptive" else {"type": "between_tools"}
         )

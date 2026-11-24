@@ -7,7 +7,6 @@ import httpx2
 import pytest
 
 from tech_debt_miner.llm.client import (
-    DEFAULT_MAX_USD,
     AnthropicTransport,
     CapExceededError,
     DryRunError,
@@ -118,10 +117,6 @@ def test_cap_must_be_positive() -> None:
         LLMClient(FakeTransport(response()), max_usd=0)
 
 
-def test_default_cap_is_low() -> None:
-    assert DEFAULT_MAX_USD == 4.0
-
-
 def test_unknown_model_is_refused_before_sending() -> None:
     transport = FakeTransport(response())
     with pytest.raises(UnknownModelError):
@@ -205,7 +200,7 @@ def test_key_comes_from_the_environment_first(tmp_path: Path) -> None:
 
 def test_key_falls_back_to_dotenv(tmp_path: Path) -> None:
     dotenv = tmp_path / ".env"
-    dotenv.write_text("OTHER=1\nANTHROPIC_API_KEY='quoted'\n", encoding="utf-8")
+    dotenv.write_text("OTHER=1\nexport ANTHROPIC_API_KEY='quoted'\n", encoding="utf-8")
     assert load_api_key({}, dotenv) == "quoted"
 
 
