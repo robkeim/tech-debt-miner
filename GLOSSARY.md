@@ -38,3 +38,11 @@ A Run that builds every prompt and estimates cost but makes no LLM calls.
 **Leakage test**:
 A test proving that nothing dated after the Cutoff date reaches a prompt or feature.
 _Avoid_: Cutoff test
+
+**Fix commit**:
+A commit on the Target repo's default branch that is identified as a bug fix by the rule in [ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md).
+_Avoid_: Bug commit, fixing commit
+
+**Label**:
+The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date.
+_Avoid_: Ground truth (as a noun for one file's value), tag
