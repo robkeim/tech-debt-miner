@@ -5,6 +5,7 @@ import pytest
 
 from support.fixture_repo import Commit, build_fixture_repo, git, head_sha
 from tech_debt_miner import cli
+from tech_debt_miner.run.artifacts import MANIFEST
 from tech_debt_miner.run.resolve import ADR_FILES, ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir
 
@@ -70,7 +71,7 @@ def test_resolve_writes_the_manifest_and_creates_the_run_dir(
 ) -> None:
     run_dir = resolve(inputs(), deps_for(tmp_path, tool_root))
 
-    manifest = run_dir.read_manifest()
+    manifest = run_dir.read(MANIFEST)
     assert run_dir.path.parent == tmp_path / "runs"
     assert manifest.target_repo == "owner/target"
     assert manifest.cutoff_date == "2024-01-01"
@@ -89,12 +90,12 @@ def test_pinned_sha_is_the_last_commit_before_the_cutoff(tmp_path: Path, tool_ro
     run_dir = resolve(inputs(), deps_for(tmp_path, tool_root))
 
     before = git(tmp_path / "repos" / "target", "rev-list", "--max-parents=0", "HEAD").strip()
-    assert run_dir.read_manifest().pinned_sha == before
+    assert run_dir.read(MANIFEST).pinned_sha == before
 
 
 @pytest.mark.usefixtures("repos_dir")
 def test_adr_shas_are_the_last_commit_touching_each_adr(tmp_path: Path, tool_root: Path) -> None:
-    manifest = resolve(inputs(), deps_for(tmp_path, tool_root)).read_manifest()
+    manifest = resolve(inputs(), deps_for(tmp_path, tool_root)).read(MANIFEST)
 
     assert manifest.adr_shas["0005"] == head_sha(tool_root)
     assert manifest.adr_shas["0007"] != head_sha(tool_root)
@@ -125,7 +126,7 @@ def test_cli_resolve_then_status(
 
     assert cli.main(argv) == 0
     run_id = capsys.readouterr().out.strip()
-    assert RunDir(runs_dir / run_id).read_manifest().repeats == 3
+    assert RunDir(runs_dir / run_id).read(MANIFEST).repeats == 3
 
     assert cli.main(["status", run_id, "--runs-dir", str(runs_dir)]) == 0
     assert capsys.readouterr().out.strip() == "resolved"

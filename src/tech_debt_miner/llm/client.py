@@ -17,7 +17,6 @@ import anthropic
 import httpx2
 
 from tech_debt_miner.llm.cache import ResponseCache
-from tech_debt_miner.run import store
 from tech_debt_miner.types import LoggedResponse, Request, Response
 
 DEFAULT_MAX_USD = 4.0  # ADR 0010; raised only via `--max-usd`
@@ -190,7 +189,7 @@ class LLMClient:
         max_usd: float,
         log: Callable[[Mapping[str, object]], None] = lambda _record: None,
         cache: ResponseCache | None = None,
-        on_response: Callable[[Mapping[str, object]], None] = lambda _row: None,
+        on_response: Callable[[LoggedResponse], None] = lambda _row: None,
         secrets: tuple[str, ...] = (),
         spent_usd: float = 0.0,
         max_attempts: int = MAX_ATTEMPTS,
@@ -329,7 +328,7 @@ class LLMClient:
             cache_hit=cache_hit,
             response=replace(response, text=redact(response.text, self._secrets)),
         )
-        self._on_response(store.logged_response_to_json(logged))
+        self._on_response(logged)
 
 
 def _cost(price: Price, input_tokens: int, output_tokens: int) -> float:

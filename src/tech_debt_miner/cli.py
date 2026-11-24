@@ -8,7 +8,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
-from tech_debt_miner.run.run_dir import RunDir
+from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K, June 30 2026 (ADR 0006)
@@ -64,12 +64,12 @@ def _resolve(args: argparse.Namespace) -> int:
 
 
 def _status(args: argparse.Namespace) -> int:
-    run_dir = RunDir(args.runs_dir / args.run_id)
-    if not run_dir.manifest_path.exists():
-        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)  # noqa: T201 - the CLI's job is to print
         return 2
-    state = run_dir.state()
-    print(state.value if state else "resolved")  # noqa: T201 - the CLI's job is to print
+    print(run_dir.state().value)  # noqa: T201 - the CLI's job is to print
     return 0
 
 

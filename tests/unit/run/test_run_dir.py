@@ -1,11 +1,34 @@
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from tech_debt_miner.run.run_dir import RunDir, RunState, Stage, run_id
-from tech_debt_miner.types import Labels, Manifest, Ranking, Request, Scores, Snapshot
+from tech_debt_miner.run.artifacts import (
+    ALL,
+    LABELS,
+    RANKING,
+    REQUESTS,
+    SCORES,
+    SNAPSHOT,
+    Artifact,
+    Policy,
+)
+from tech_debt_miner.run.artifacts import (
+    MANIFEST as MANIFEST_FILE,
+)
+from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, RunState, Stage, run_id
+from tech_debt_miner.types import (
+    FileFacts,
+    Issue,
+    Labels,
+    Manifest,
+    Ranking,
+    Request,
+    Scores,
+    Snapshot,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -54,7 +77,7 @@ def test_run_id_uses_utc() -> None:
 def test_create_writes_manifest_that_reads_back(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     assert run.path == tmp_path / run_id(MANIFEST, NOW)
-    assert run.read_manifest() == MANIFEST
+    assert run.read(MANIFEST_FILE) == MANIFEST
 
 
 def test_create_refuses_an_existing_run(tmp_path: Path) -> None:
@@ -63,75 +86,158 @@ def test_create_refuses_an_existing_run(tmp_path: Path) -> None:
         make_run(tmp_path)
 
 
-def test_artifact_paths(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    assert run.ranking_path("baseline", 0) == run.path / "rankings" / "baseline.json"
-    assert run.ranking_path("llm", 2) == run.path / "rankings" / "llm-2.json"
-    assert run.scores_path("2027-01-31") == run.path / "scores-2027-01-31.json"
+def test_keyed_artifact_paths() -> None:
+    assert RANKING.path(("baseline", 0)) == "rankings/baseline.json"
+    assert RANKING.path(("llm", 2)) == "rankings/llm-2.json"
+    assert SCORES.path("2027-01-31") == "scores-2027-01-31.json"
 
 
-def test_artifacts_round_trip(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    snapshot = Snapshot(files=(), issues=())
-    request = Request("llm", 0, 0, "m", "s", "p", 10)
-    ranking = Ranking("llm", 1, ("a.py",))
-    run.write_snapshot(snapshot)
-    run.append_request(request)
-    run.append_response({"text": "hi"})
-    run.write_ranking(ranking)
-    run.write_cost({"usd": 1.5})
-    run.write_labels(Labels({"a.py": 1}))
-    run.write_scores("2027-01-31", Scores({"m": 0.1}))
-    assert run.read_snapshot() == snapshot
-    assert run.read_requests() == [request]
-    assert run.read_responses() == [{"text": "hi"}]
-    assert run.read_ranking("llm", 1) == ranking
-    assert run.read_cost() == {"usd": 1.5}
-    assert run.read_labels() == Labels({"a.py": 1})
-    assert run.read_scores("2027-01-31") == Scores({"m": 0.1})
+# One sample value and key per artifact; the table test fails if one is missing.
+SAMPLES: dict[str, tuple[Any, Any]] = {
+    "manifest": (MANIFEST, None),
+    "snapshot": (
+        Snapshot(
+            files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
+            issues=(Issue(number=1, title="t", body="b"),),
+        ),
+        None,
+    ),
+    "requests": (Request("llm", 0, 0, "m", "s", "p", 10), None),
+    "responses": ({"text": "hi"}, None),
+    "cost": ({"usd": 1.5}, None),
+    "labels": (Labels({"a.py": 1}), None),
+    "ranking": (Ranking("llm", 1, ("a.py",)), ("llm", 1)),
+    "scores": (Scores({"m": 0.1}), "2027-01-31"),
+}
 
 
-def test_scores_are_never_overwritten(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    run.write_scores("2027-01-31", Scores({"m": 0.1}))
+def test_every_artifact_has_a_sample() -> None:
+    assert {artifact.name for artifact in ALL} == set(SAMPLES)
+
+
+@pytest.mark.parametrize("artifact", ALL, ids=lambda artifact: artifact.name)
+def test_artifacts_round_trip(tmp_path: Path, artifact: Artifact[Any, Any]) -> None:
+    run = RunDir(tmp_path / "run")
+    value, key = SAMPLES[artifact.name]
+    if artifact.policy is Policy.APPEND:
+        run.append(artifact, value)
+        assert run.read_all(artifact) == [value]
+    else:
+        run.write(artifact, value, key)
+        assert run.read(artifact, key) == value
+    assert run.exists(artifact, key)
+
+
+@pytest.mark.parametrize("artifact", [a for a in ALL if a.policy is Policy.CREATE_ONCE])
+def test_create_once_artifacts_are_never_overwritten(
+    tmp_path: Path, artifact: Artifact[Any, Any]
+) -> None:
+    run = RunDir(tmp_path / "run")
+    value, key = SAMPLES[artifact.name]
+    run.write(artifact, value, key)
     with pytest.raises(FileExistsError):
-        run.write_scores("2027-01-31", Scores({"m": 0.2}))
-    run.write_scores("2027-03-01", Scores({"m": 0.3}))
-    assert run.scoring_dates() == ["2027-01-31", "2027-03-01"]
+        run.write(artifact, value, key)
 
 
-def test_stage_done_means_final_artifact_exists(tmp_path: Path) -> None:
+def test_ranking_key_is_derived_from_the_value(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    assert run.is_done(Stage.RESOLVE)
-    assert not run.is_done(Stage.SNAPSHOT)
-    run.write_snapshot(Snapshot(files=(), issues=()))
-    assert run.is_done(Stage.SNAPSHOT)
-    assert not run.is_done(Stage.LABEL)
-    assert not run.is_done(Stage.SCORE)
+    run.write(RANKING, Ranking("llm", 2, ("a.py",)))
+    assert (run.path / "rankings" / "llm-2.json").exists()
 
 
-def test_rank_is_done_only_when_every_ranking_exists(tmp_path: Path) -> None:
+def test_policy_mismatches_are_rejected(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    run.write_ranking(Ranking("baseline", 0, ()))
-    run.write_ranking(Ranking("llm", 0, ()))
-    assert not run.is_done(Stage.RANK)
-    assert run.has_ranking("llm", 0)
-    assert not run.has_ranking("llm", 1)
-    run.write_ranking(Ranking("llm", 1, ()))
-    assert run.is_done(Stage.RANK)
+    with pytest.raises(TypeError, match="cannot append to snapshot"):
+        run.append(SNAPSHOT, SAMPLES["snapshot"][0])
+    with pytest.raises(TypeError, match="cannot write requests"):
+        run.write(REQUESTS, SAMPLES["requests"][0])
+    with pytest.raises(TypeError, match="cannot be enumerated"):
+        run.keys(SNAPSHOT)
+    with pytest.raises(TypeError, match="cannot read requests"):
+        run.read(REQUESTS)
+    with pytest.raises(TypeError, match="cannot read all rows of snapshot"):
+        run.read_all(SNAPSHOT)
 
 
-def test_state_is_derived_from_artifacts(tmp_path: Path) -> None:
+def test_a_keyed_artifact_needs_its_key(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    assert run.state() is None
-    run.write_snapshot(Snapshot(files=(), issues=()))
-    assert run.state() is None
-    run.append_request(Request("llm", 0, 0, "m", "s", "p", 10))
+    with pytest.raises(TypeError, match="scores needs a key"):
+        run.write(SCORES, Scores({}))
+    with pytest.raises(TypeError, match="scores needs a key"):
+        run.read(SCORES)
+    assert not list(run.path.glob("scores-*"))
+
+
+def test_scores_are_listed_by_date(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SCORES, Scores({"m": 0.1}), "2027-03-01")
+    run.write(SCORES, Scores({"m": 0.1}), "2027-01-31")
+    assert run.keys(SCORES) == ["2027-01-31", "2027-03-01"]
+
+
+REQUEST = Request("llm", 0, 0, "m", "s", "p", 10)
+SNAPSHOT_VALUE = Snapshot(files=(), issues=())
+
+
+def test_open_finds_an_existing_run(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    assert RunDir.open(tmp_path, run.id).path == run.path
+
+
+def test_open_refuses_a_directory_without_a_manifest(tmp_path: Path) -> None:
+    (tmp_path / "stray").mkdir()
+    with pytest.raises(RunNotFoundError, match="no such Run: stray"):
+        RunDir.open(tmp_path, "stray")
+    with pytest.raises(RunNotFoundError, match="no such Run: nope"):
+        RunDir.open(tmp_path, "nope")
+
+
+def test_a_fresh_run_is_resolved_and_needs_a_snapshot(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    assert run.state() is RunState.RESOLVED
+    assert run.next_stage() is Stage.SNAPSHOT
+
+
+def test_a_snapshot_without_requests_is_still_resolved(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    assert run.state() is RunState.RESOLVED
+    assert run.next_stage() is Stage.RANK
+
+
+def test_a_planned_run_resumes_at_rank(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
     assert run.state() is RunState.PLANNED
+    assert run.next_stage() is Stage.RANK
+
+
+def test_rank_resumes_per_ranking(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
+    assert run.missing_rankings() == [("baseline", 0), ("llm", 0), ("llm", 1)]
+    run.write(RANKING, Ranking("baseline", 0, ()))
+    run.write(RANKING, Ranking("llm", 0, ()))
+    assert run.missing_rankings() == [("llm", 1)]
+    assert run.state() is RunState.PLANNED
+    assert run.next_stage() is Stage.RANK
+    run.write(RANKING, Ranking("llm", 1, ()))
+    assert run.missing_rankings() == []
+
+
+def test_a_ranked_run_resumes_at_label_then_score(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
     for ranking in (Ranking("baseline", 0, ()), Ranking("llm", 0, ()), Ranking("llm", 1, ())):
-        run.write_ranking(ranking)
+        run.write(RANKING, ranking)
     assert run.state() is RunState.RANKED
-    run.write_labels(Labels({}))
+    assert run.next_stage() is Stage.LABEL
+    run.write(LABELS, Labels({}))
     assert run.state() is RunState.RANKED
-    run.write_scores("2027-01-31", Scores({}))
+    assert run.next_stage() is Stage.SCORE
+    run.write(SCORES, Scores({}), "2027-01-31")
     assert run.state() is RunState.SCORED
+    assert run.next_stage() is None

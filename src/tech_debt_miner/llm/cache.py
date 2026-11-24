@@ -1,4 +1,4 @@
-"""The Response cache: a global store of replies keyed by the exact request (ADR 0008, ADR 0015).
+"""The Response cache: a global store of replies keyed by the exact request (ADR 0008, ADR 0016).
 
 Never pay twice for an identical request. The key covers everything the API sees plus the repeat
 and attempt indexes, which the API does not see: the 3 repeats send identical requests, and a key

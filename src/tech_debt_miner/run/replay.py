@@ -2,14 +2,14 @@
 
 from collections.abc import Callable
 
-from tech_debt_miner.run import store
+from tech_debt_miner.run.artifacts import RESPONSES
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import LoggedResponse, Ranking
 
 
 def logged_responses(run_dir: RunDir) -> list[LoggedResponse]:
     """Every row of `responses.jsonl`, in log order. Reads the Run directory only."""
-    return [store.logged_response_from_json(row) for row in run_dir.read_responses()]
+    return run_dir.read_all(RESPONSES)
 
 
 def final_responses(run_dir: RunDir) -> dict[tuple[str, int], LoggedResponse]:

@@ -6,7 +6,7 @@ import pytest
 
 from tech_debt_miner.llm.cache import ResponseCache
 from tech_debt_miner.llm.client import LLMClient, ProviderError, UnparsableOutputError
-from tech_debt_miner.types import Request, Response
+from tech_debt_miner.types import LoggedResponse, Request, Response
 
 pytestmark = pytest.mark.unit
 
@@ -66,16 +66,16 @@ def test_repeats_are_not_collapsed_by_the_cache(tmp_path: Path) -> None:
 
 
 def test_every_response_is_logged_whether_hit_or_miss(tmp_path: Path) -> None:
-    rows: list[Mapping[str, object]] = []
+    rows: list[LoggedResponse] = []
     client = LLMClient(
         Script(), max_usd=1.0, cache=ResponseCache(tmp_path), on_response=rows.append
     )
     client.complete(request())
     client.complete(request())
-    assert [row["cache_hit"] for row in rows] == [False, True]
-    assert {**rows[0], "cache_hit": True} == rows[1]
-    assert rows[0]["text"] == "ok"
-    assert rows[0]["request_id"] == "req_1"
+    assert [row.cache_hit for row in rows] == [False, True]
+    assert replace(rows[0], cache_hit=True) == rows[1]
+    assert rows[0].response.text == "ok"
+    assert rows[0].response.request_id == "req_1"
 
 
 def test_the_per_attempt_log_marks_cache_hits(tmp_path: Path) -> None:
@@ -90,21 +90,21 @@ def test_the_per_attempt_log_marks_cache_hits(tmp_path: Path) -> None:
 
 
 def test_logged_response_text_is_redacted() -> None:
-    rows: list[Mapping[str, object]] = []
+    rows: list[LoggedResponse] = []
     client = LLMClient(Script(f"key {KEY}"), max_usd=1.0, on_response=rows.append, secrets=(KEY,))
     client.complete(request())
     assert KEY not in str(rows)
 
 
 def test_unparsable_output_is_retried_once_with_the_next_attempt(tmp_path: Path) -> None:
-    rows: list[Mapping[str, object]] = []
+    rows: list[LoggedResponse] = []
     transport = Script("garbage", "42")
     client = LLMClient(
         transport, max_usd=1.0, cache=ResponseCache(tmp_path), on_response=rows.append
     )
     assert client.complete_parsed(request(), parse_int) == 42
     assert [call.attempt for call in transport.calls] == [0, 1]
-    assert [(row["attempt"], row["text"]) for row in rows] == [(0, "garbage"), (1, "42")]
+    assert [(row.attempt, row.response.text) for row in rows] == [(0, "garbage"), (1, "42")]
 
 
 def test_a_cached_bad_reply_does_not_repeat_forever(tmp_path: Path) -> None:
@@ -129,8 +129,8 @@ def test_amend_rewrites_the_retry() -> None:
 
 
 def test_two_unparsable_replies_fail_loudly_with_both_logged() -> None:
-    rows: list[Mapping[str, object]] = []
+    rows: list[LoggedResponse] = []
     client = LLMClient(Script("a", "b"), max_usd=1.0, on_response=rows.append)
     with pytest.raises(UnparsableOutputError):
         client.complete_parsed(request(), parse_int)
-    assert [row["text"] for row in rows] == ["a", "b"]
+    assert [row.response.text for row in rows] == ["a", "b"]
