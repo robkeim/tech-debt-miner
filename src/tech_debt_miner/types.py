@@ -12,7 +12,8 @@ class Manifest:
     pinned_sha: str
     cutoff_date: str  # ISO 8601 date, e.g. "2025-01-31"
     model: str  # model snapshot id
-    model_training_cutoff: str  # ISO 8601 date
+    model_training_cutoff: str  # ISO 8601 date, K
+    cutoff_minus_training_days: int  # C - K in days; negative when the Cutoff date precedes K
     repeats: int
     prompt_hashes: Mapping[str, str]  # template name -> hash
     lizard_version: str

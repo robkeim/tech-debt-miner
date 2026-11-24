@@ -168,3 +168,14 @@ def test_nothing_after_the_cutoff_date_is_returned(repo: Path) -> None:
     with repo_git.export_tree(repo, pinned) as tree:
         contents = "".join(p.read_text(encoding="utf-8") for p in tree.rglob("*.py"))
     assert POISON not in contents
+
+
+def test_head_sha_and_last_commit_touching(repo: Path) -> None:
+    assert repo_git.head_sha(repo) == shas(repo)[-1]
+    assert repo_git.last_commit_touching(repo, "a.py") == shas(repo)[4]
+    assert repo_git.last_commit_touching(repo, "old.py") == shas(repo)[2]
+
+
+def test_last_commit_touching_an_unknown_path_fails(repo: Path) -> None:
+    with pytest.raises(GitError, match="no commit touches"):
+        repo_git.last_commit_touching(repo, "nope.py")

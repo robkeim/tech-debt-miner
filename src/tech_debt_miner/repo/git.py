@@ -70,6 +70,20 @@ def clone_repo(url: str, dest: Path) -> Path:
     return dest
 
 
+def head_sha(repo: Path) -> str:
+    """Return the commit SHA of `HEAD`."""
+    return _git("rev-parse", "HEAD", cwd=repo).decode().strip()
+
+
+def last_commit_touching(repo: Path, path: str) -> str:
+    """Return the SHA of the newest commit that changed `path`."""
+    sha = _git("log", "-1", "--format=%H", "--", path, cwd=repo).decode().strip()
+    if not sha:
+        msg = f"no commit touches {path}"
+        raise GitError(msg)
+    return sha
+
+
 def resolve_pinned_sha(repo: Path, cutoff: date) -> str:
     """Return the newest first-parent commit before the Cutoff date whose history is all earlier.
 

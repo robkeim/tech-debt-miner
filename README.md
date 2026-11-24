@@ -14,6 +14,15 @@ The process (agent workflow, quality gate, docs structure) is part of what's bei
 
 _To be written once the method is settled. Decisions that shape it are recorded as ADRs in `docs/adr/`._
 
+## Running
+
+```sh
+uv run tdm resolve --repo owner/name --cutoff 2026-07-01   # clones into repos/, prints the Run id
+uv run tdm status <run-id>                                  # resolved, planned, ranked or scored
+```
+
+`resolve` writes `runs/<run-id>/manifest.json` once. The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
+
 ## Development
 
 ```sh

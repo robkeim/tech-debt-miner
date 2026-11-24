@@ -17,6 +17,7 @@ MANIFEST = Manifest(
     cutoff_date="2025-01-31",
     model="model-1",
     model_training_cutoff="2024-06-01",
+    cutoff_minus_training_days=244,
     repeats=2,
     prompt_hashes={"triage": "h1", "rank": "h2"},
     lizard_version="1.17",

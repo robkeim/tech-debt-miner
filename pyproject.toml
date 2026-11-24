@@ -5,10 +5,11 @@ description = "Backtest whether an LLM can rank files by technical-debt risk bet
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = ["lizard"]
 
 [project.scripts]
 gate = "gate.cli:main"
+tdm = "tech_debt_miner.cli:main"
 
 [dependency-groups]
 dev = [

@@ -9,7 +9,7 @@ One execution of an experiment against a target repo, producing rankings and sco
 _Avoid_: Job, execution, trial
 
 **Manifest**:
-The immutable record of everything needed to identify and re-score a Run: model, prompt hashes, target repo SHA and cutoff date. Actual cost is recorded beside it in `cost.json`.
+The immutable record of everything needed to identify and re-score a Run: model, its training cutoff and the gap to the Cutoff date, prompt hashes, target repo SHA and cutoff date. Actual cost is recorded beside it in `cost.json`.
 _Avoid_: Metadata, run config
 
 **Target repo**:
@@ -62,3 +62,7 @@ _Avoid_: Window (unqualified), lookback
 **Triage set**:
 The at most 100 files the LLM ranker's triage stage selects from a digest of every eligible file, and the only files the rank stage sees code for. Not the ranked output, which holds at most 50.
 _Avoid_: Shortlist (ADR 0005 uses that word for the ranked output)
+
+**Eligible file**:
+A `*.py` source file that is not a test, doc, generated or vendored file, decided by path alone, ignoring case ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The ranked set and the Label both use only eligible files.
+_Avoid_: Source file (unqualified), candidate

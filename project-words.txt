@@ -98,6 +98,7 @@ traveller
 undiscounted
 unionai
 unranked
+usefixtures
 venv
 wayfinder
 wayfinding
