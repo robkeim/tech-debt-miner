@@ -49,9 +49,8 @@ def dcg_at_k(groups: Sequence[Collection[str]], labels: Mapping[str, int], k: in
                 seen.add(path)
                 group_gain += gain(labels.get(path, 0))
         last = min(position + size - 1, k)
-        if last >= position:
-            discounts = math.fsum(discount(p) for p in range(position, last + 1))
-            total += group_gain * discounts / size
+        slot_discounts = math.fsum(discount(p) for p in range(position, last + 1))
+        total += group_gain * slot_discounts / size
         position += size
         if position > k:
             break
