@@ -1,6 +1,6 @@
 # Target repos and Cutoff dates are chosen to sit after the model's training cutoff
 
-Accepted. Decided in #36 from the research in #35. Supplements the pre-registration in [ADR 0005](0005-scoring-pre-registration.md); the Label is [ADR 0004](0004-label-is-future-fix-proneness.md). The "at least 25 candidate Fix commits" criterion is replaced by [ADR 0011](0011-repo-eligibility-uses-label-coverage.md).
+Accepted. Decided in #36 from the research in #35. Supplements the pre-registration in [ADR 0005](0005-scoring-pre-registration.md); the Label is [ADR 0004](0004-label-is-future-fix-proneness.md).
 
 ## Decisions
 
@@ -74,3 +74,7 @@ Window-dependent columns cover 2026-07-01 to 2026-11-24 (79% of the primary wind
 
 - Recount at 2026-12-31 and replace any repo below 25 tracker-confirmed Fix commits or 10 files with a Label of 1 or more. A replacement is a new amendment, chosen blind.
 - Re-verify the source file range once #38 fixes the path filter.
+
+## Amendments
+
+- 2026-11-24: The "at least 25 candidate Fix commits" criterion is replaced by [ADR 0011](0011-repo-eligibility-uses-label-coverage.md).

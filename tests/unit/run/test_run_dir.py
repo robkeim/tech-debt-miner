@@ -101,6 +101,7 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
         Snapshot(
             files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
             issues=(Issue(number=1, title="t", body="b"),),
+            zero_complexity_files=4,
         ),
         None,
     ),
@@ -183,7 +184,7 @@ def test_scores_are_listed_by_date(tmp_path: Path) -> None:
 
 
 REQUEST = Request("llm", 0, 0, "m", "s", "p", 10)
-SNAPSHOT_VALUE = Snapshot(files=(), issues=())
+SNAPSHOT_VALUE = Snapshot(files=(), issues=(), zero_complexity_files=0)
 
 
 def test_open_finds_an_existing_run(tmp_path: Path) -> None:

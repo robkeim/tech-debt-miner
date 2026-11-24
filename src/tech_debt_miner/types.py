@@ -1,7 +1,7 @@
 """Core types: frozen, plain data. This module imports nothing else from the package."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -40,6 +40,7 @@ class Issue:
 class Snapshot:
     files: tuple[FileFacts, ...]
     issues: tuple[Issue, ...]
+    zero_complexity_files: int  # files scored 0: no functions, or lizard could not analyze
 
 
 @dataclass(frozen=True)
@@ -64,7 +65,15 @@ class Ranking:
 
 @dataclass(frozen=True)
 class Labels:
-    counts: Mapping[str, int]  # path -> number of Fix commits after the Cutoff date
+    counts: Mapping[str, int]  # Cutoff-date path -> number of Fix commits after the Cutoff date
+    stats: Mapping[str, float] = field(
+        default_factory=dict[str, float]
+    )  # ADR 0004 reporting figures
+    # Where the counts came from: the clone's HEAD, its newest commit date (ISO 8601) and
+    # whether the clone was fast-forwarded first.
+    clone_head: str = ""
+    clone_newest_commit: str = ""
+    fetched: bool = False
 
 
 @dataclass(frozen=True)
