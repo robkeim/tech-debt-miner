@@ -63,7 +63,7 @@ flowchart TB
 | `responses.jsonl` | In the Run | The self-contained record. Cache hits are copied in, so Replay reads only the Run directory and never the cache. |
 | Stage artifacts | In the Run | The checkpoints. There is no per-call checkpoint beyond the cache. |
 
-- **The repeat index is part of the cache key** and of the request record, but is not sent to the API. At temperature 0 the 3 repeats send identical requests, and a key without it would return one response three times, silently turning 3 repeats into 1. A new Run reuses cache entries only for identical (request, repeat) pairs.
+- **The repeat index is part of the cache key** and of the request record, but is not sent to the API. The 3 repeats send identical requests, and a key without it would return one response three times, silently turning 3 repeats into 1. Claude Sonnet 5.5 rejects non-default `temperature`, `top_p` and `top_k` (a 400), and every model does from 2026-10-21, so the repeats are samples at the API's default sampling settings, not temperature 0 (see Known limits). A new Run reuses cache entries only for identical (request, repeat) pairs.
 - **Unparsable output** is always logged raw. The client retries once with an `attempt` index in the cache key, because a cache would otherwise return the same bad response forever. If it is still unparsable, `rank` fails loudly and stays resumable. A failed repeat is never silently scored as an empty ranking.
 
 ## Issues in the snapshot
@@ -82,6 +82,7 @@ ADR 0005 lets both rankers see issues as of the Cutoff date. Issue state is rebu
 - Abandoned Dry-run directories accumulate in the gitignored `runs/`.
 - An old Run can be replayed only by old code.
 - Excluding issues edited after the Cutoff date removes some legitimate context, and the excluded count shows how much.
+- ADR 0005 specifies "3 LLM repeats at temperature 0", which the API no longer allows. This ADR does not change ADR 0005. It needs an amendment ADR: the repeats are default-sampling draws, the variation they measure is larger, and the "Repeats at temperature 0" rationale no longer holds.
 - The unverified part of the issue rebuild is the edit history. REST returns only the current body, and GraphQL `userContentEdits` was not checked against public repos. The snapshot spike must confirm it, or fall back to excluding every issue it cannot prove clean.
 
 ## Alternatives rejected
