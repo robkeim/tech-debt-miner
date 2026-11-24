@@ -1,4 +1,4 @@
-"""The Run directory: the only code that knows artifact names and paths."""
+"""The Run directory: the only code that touches Run files, over the table in `artifacts`."""
 
 import hashlib
 from collections.abc import Callable
@@ -86,7 +86,7 @@ class RunDir:
         self._require(artifact, Policy.REPLACE, Policy.CREATE_ONCE, op="write")
         path = self._path(artifact, self._key_for(artifact, value, key))
         if artifact.policy is Policy.CREATE_ONCE and path.exists():
-            msg = f"{path.name} already exists; {artifact.name} are never overwritten"
+            msg = f"{path.name} already exists; it is never overwritten"
             raise FileExistsError(msg)
         store.write_json(path, artifact.encode(value))
 
@@ -95,7 +95,7 @@ class RunDir:
         store.append_jsonl(self._path(artifact, None), artifact.encode(value))
 
     def read_all[T](self, artifact: Artifact[T, None]) -> list[T]:
-        self._require(artifact, Policy.APPEND, op="read_all of")
+        self._require(artifact, Policy.APPEND, op="read all rows of")
         return [artifact.decode(row) for row in store.read_jsonl(self._path(artifact, None))]
 
     def keys[K](self, artifact: Artifact[Any, K]) -> list[K]:
@@ -107,6 +107,9 @@ class RunDir:
         return sorted(parsed, key=str)
 
     def _path(self, artifact: Artifact[Any, Any], key: object) -> Path:
+        if artifact.keyed and key is None:
+            msg = f"{artifact.name} needs a key"
+            raise TypeError(msg)
         return self.path / artifact.path(key)
 
     @staticmethod

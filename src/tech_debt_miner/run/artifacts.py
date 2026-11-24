@@ -31,6 +31,7 @@ class Artifact[T, K]:
     encode: Callable[[T], Any]
     decode: Callable[[Any], T]
     policy: Policy
+    keyed: bool = False  # the key is required; singletons use `None`
     key_of: Callable[[T], K] | None = None  # derive the key from a value, when it carries one
     glob: str | None = None  # matches every file of a keyed artifact
     parse_key: Callable[[str], K] | None = None  # file name -> key, the inverse of `path`
@@ -80,6 +81,7 @@ RANKING = Artifact[Ranking, tuple[str, int]](
     store.to_json,
     store.ranking_from_json,
     Policy.REPLACE,
+    keyed=True,
     key_of=lambda ranking: (ranking.ranker, ranking.repeat),
 )
 
@@ -91,6 +93,7 @@ SCORES = Artifact[Scores, str](
     store.to_json,
     store.scores_from_json,
     Policy.CREATE_ONCE,
+    keyed=True,
     glob=f"{_SCORES_PREFIX}*{_SCORES_SUFFIX}",
     parse_key=lambda file_name: file_name.removeprefix(_SCORES_PREFIX).removesuffix(_SCORES_SUFFIX),
 )

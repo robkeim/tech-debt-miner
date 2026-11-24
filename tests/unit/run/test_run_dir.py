@@ -153,6 +153,19 @@ def test_policy_mismatches_are_rejected(tmp_path: Path) -> None:
         run.write(REQUESTS, SAMPLES["requests"][0])
     with pytest.raises(TypeError, match="cannot be enumerated"):
         run.keys(SNAPSHOT)
+    with pytest.raises(TypeError, match="cannot read requests"):
+        run.read(REQUESTS)
+    with pytest.raises(TypeError, match="cannot read all rows of snapshot"):
+        run.read_all(SNAPSHOT)
+
+
+def test_a_keyed_artifact_needs_its_key(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    with pytest.raises(TypeError, match="scores needs a key"):
+        run.write(SCORES, Scores({}))
+    with pytest.raises(TypeError, match="scores needs a key"):
+        run.read(SCORES)
+    assert not list(run.path.glob("scores-*"))
 
 
 def test_scores_are_listed_by_date(tmp_path: Path) -> None:
