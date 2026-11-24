@@ -48,6 +48,7 @@ def test_snapshot_round_trip() -> None:
     snapshot = Snapshot(
         files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
         issues=(Issue(number=1, title="t", body="b"),),
+        zero_complexity_files=4,
     )
     assert store.snapshot_from_json(store.to_json(snapshot)) == snapshot
 
