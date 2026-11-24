@@ -75,6 +75,7 @@ pyproject
 pytest
 pytestmark
 pythonpath
+quotepath
 robkeim
 scikit
 scoreable
