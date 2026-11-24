@@ -18,9 +18,11 @@ from tech_debt_miner.types import (
     FileFacts,
     Issue,
     Labels,
+    LoggedResponse,
     Manifest,
     Ranking,
     Request,
+    Response,
     Scores,
     Snapshot,
 )
@@ -124,3 +126,35 @@ def labels_from_json(data: Mapping[str, Any]) -> Labels:
 
 def scores_from_json(data: Mapping[str, Any]) -> Scores:
     return Scores(metrics=dict(data["metrics"]))
+
+
+def response_from_json(data: Mapping[str, Any]) -> Response:
+    return Response(
+        text=data["text"],
+        input_tokens=data["input_tokens"],
+        output_tokens=data["output_tokens"],
+        stop_reason=data["stop_reason"],
+        request_id=data["request_id"],
+        model=data["model"],
+    )
+
+
+def logged_response_to_json(logged: LoggedResponse) -> dict[str, Any]:
+    """Flatten to one `responses.jsonl` row: the request identity beside the Response fields."""
+    return {
+        "ranker": logged.ranker,
+        "repeat": logged.repeat,
+        "attempt": logged.attempt,
+        "cache_hit": logged.cache_hit,
+        **to_json(logged.response),
+    }
+
+
+def logged_response_from_json(data: Mapping[str, Any]) -> LoggedResponse:
+    return LoggedResponse(
+        ranker=data["ranker"],
+        repeat=data["repeat"],
+        attempt=data["attempt"],
+        cache_hit=data["cache_hit"],
+        response=response_from_json(data),
+    )

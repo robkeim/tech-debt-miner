@@ -25,11 +25,11 @@ The past date a Target repo is rewound to; only history before it is visible to 
 _Avoid_: As-of date, rewind date
 
 **Replay**:
-Re-scoring a Run from its logged LLM responses without calling the LLM again.
+Re-scoring a Run from its logged LLM responses (`responses.jsonl`) without calling the LLM again, and without the Response cache or the Target repo.
 _Avoid_: Rerun (a rerun calls the LLM again)
 
 **Response cache**:
-A local store of LLM responses keyed by the exact request, so identical requests are never paid for twice.
+A local store of LLM responses keyed by the exact request, repeat index and attempt index ([ADR 0015](docs/adr/0015-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:

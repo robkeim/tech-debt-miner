@@ -82,3 +82,14 @@ class Response:
     stop_reason: str
     request_id: str
     model: str  # the model snapshot the provider says it served
+
+
+@dataclass(frozen=True)
+class LoggedResponse:
+    """One row of a Run's `responses.jsonl`: a Response and the request identity it answers."""
+
+    ranker: str
+    repeat: int
+    attempt: int
+    cache_hit: bool  # True when served from the Response cache, False when the API was called
+    response: Response

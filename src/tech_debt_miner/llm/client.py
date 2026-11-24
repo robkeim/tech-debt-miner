@@ -9,14 +9,16 @@ raises on send, not a flag.
 import re
 import time
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, Protocol
 
 import anthropic
 import httpx2
 
-from tech_debt_miner.types import Request, Response
+from tech_debt_miner.llm.cache import ResponseCache
+from tech_debt_miner.run import store
+from tech_debt_miner.types import LoggedResponse, Request, Response
 
 DEFAULT_MAX_USD = 4.0  # ADR 0010; raised only via `--max-usd`
 KEY_VARIABLE = "ANTHROPIC_API_KEY"
@@ -55,6 +57,10 @@ class CapExceededError(LLMError):
 
 class UnknownModelError(LLMError):
     """The model has no entry in `PRICES`."""
+
+
+class UnparsableOutputError(LLMError):
+    """The reply and its one retry both failed to parse. Both are in `responses.jsonl`."""
 
 
 class MissingKeyError(LLMError):
@@ -183,6 +189,8 @@ class LLMClient:
         *,
         max_usd: float,
         log: Callable[[Mapping[str, object]], None] = lambda _record: None,
+        cache: ResponseCache | None = None,
+        responses: Callable[[Mapping[str, object]], None] = lambda _row: None,
         secrets: tuple[str, ...] = (),
         spent_usd: float = 0.0,
         max_attempts: int = MAX_ATTEMPTS,
@@ -197,12 +205,47 @@ class LLMClient:
         self._transport = transport
         self._max_usd = max_usd
         self._log = log
+        self._cache = cache
+        self._responses = responses  # a Run's `responses.jsonl`: every reply, hit or miss
         self._secrets = secrets
         self._max_attempts = max_attempts
         self._sleep = sleep
         self.spent_usd = spent_usd  # seed from cost.json when resuming a Run
 
+    def complete_parsed[T](
+        self,
+        request: Request,
+        parse: Callable[[str], T],
+        schema: Mapping[str, object] | None = None,
+        *,
+        amend: Callable[[Request, str], Request] | None = None,
+    ) -> T:
+        """Complete and parse; on a `ValueError` from `parse`, retry once with the next attempt.
+
+        Both replies are logged raw. `amend` may rewrite the retry (for example to append the
+        validation error); the attempt index is bumped either way, so the cache can't return the
+        same bad reply again (ADR 0008).
+        """
+        text = self.complete(request, schema).text
+        try:
+            return parse(text)
+        except ValueError as error:
+            retry = amend(request, str(error)) if amend else request
+        retry = replace(retry, attempt=request.attempt + 1)
+        text = self.complete(retry, schema).text
+        try:
+            return parse(text)
+        except ValueError as error:
+            msg = (
+                f"output for {request.ranker} repeat {request.repeat} did not parse twice: {error}"
+            )
+            raise UnparsableOutputError(msg) from error
+
     def complete(self, request: Request, schema: Mapping[str, object] | None = None) -> Response:
+        if self._cache is not None and (hit := self._cache.get(request, schema)) is not None:
+            self._record(request, 0, response=hit, cache_hit=True)
+            self._log_response(request, hit, cache_hit=True)
+            return hit
         price = PRICES.get(request.model)
         if price is None:
             msg = f"no price for model {request.model!r}; add it to PRICES"
@@ -239,10 +282,13 @@ class LLMClient:
             cost = _cost(price, response.input_tokens, response.output_tokens)
             self.spent_usd += cost
             self._record(request, attempt, response=response, cost=cost)
+            if self._cache is not None:
+                self._cache.put(request, response, schema)
+            self._log_response(request, response, cache_hit=False)
             return response
         raise AssertionError  # pragma: no cover - the loop always returns or raises
 
-    def _record(
+    def _record(  # noqa: PLR0913 - keyword-only fields of one log record
         self,
         request: Request,
         attempt: int,
@@ -250,6 +296,7 @@ class LLMClient:
         response: Response | None = None,
         cost: float = 0.0,
         error: str | None = None,
+        cache_hit: bool = False,
     ) -> None:
         record: dict[str, object] = {
             "ranker": request.ranker,
@@ -259,6 +306,7 @@ class LLMClient:
             "model": request.model,
             "cost_usd": cost,
             "spent_usd": self.spent_usd,
+            "cache_hit": cache_hit,
         }
         if response is not None:
             record |= {
@@ -272,6 +320,16 @@ class LLMClient:
         if error is not None:
             record["error"] = error
         self._log(record)
+
+    def _log_response(self, request: Request, response: Response, *, cache_hit: bool) -> None:
+        logged = LoggedResponse(
+            ranker=request.ranker,
+            repeat=request.repeat,
+            attempt=request.attempt,
+            cache_hit=cache_hit,
+            response=replace(response, text=redact(response.text, self._secrets)),
+        )
+        self._responses(store.logged_response_to_json(logged))
 
 
 def _cost(price: Price, input_tokens: int, output_tokens: int) -> float:
