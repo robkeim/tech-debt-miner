@@ -33,9 +33,14 @@ class Stage(StrEnum):
 
 
 class RunState(StrEnum):
+    RESOLVED = "resolved"
     PLANNED = "planned"
     RANKED = "ranked"
     SCORED = "scored"
+
+
+class RunNotFoundError(LookupError):
+    """No Run directory with a manifest exists for the id."""
 
 
 def run_id(manifest: Manifest, now: datetime) -> str:
@@ -66,6 +71,15 @@ class RunDir:
         run_dir = cls(runs_root / run_id(manifest, clock()))
         run_dir.path.mkdir(parents=True)
         run_dir.write(MANIFEST, manifest)
+        return run_dir
+
+    @classmethod
+    def open(cls, runs_root: Path, run_id: str) -> Self:
+        """Return the existing Run `run_id`, or raise RunNotFoundError."""
+        run_dir = cls(runs_root / run_id)
+        if not run_dir.exists(MANIFEST):
+            msg = f"no such Run: {run_id}"
+            raise RunNotFoundError(msg)
         return run_dir
 
     @property
@@ -124,9 +138,29 @@ class RunDir:
             msg = f"cannot {op} {artifact.name}: it is a {artifact.policy} artifact"
             raise TypeError(msg)
 
-    # Stage and state checks
+    # Stage and state
 
-    def is_done(self, stage: Stage) -> bool:
+    def state(self) -> RunState:
+        """Derive the Run's state from its artifacts. There is no marker file."""
+        if not (self._is_done(Stage.SNAPSHOT) and self.exists(REQUESTS)):
+            return RunState.RESOLVED
+        if not self._is_done(Stage.RANK):
+            return RunState.PLANNED
+        if self._is_done(Stage.LABEL) and self._is_done(Stage.SCORE):
+            return RunState.SCORED
+        return RunState.RANKED
+
+    def next_stage(self) -> Stage | None:
+        """Return the first stage that is not done, or None when all are (ADR 0008)."""
+        return next((stage for stage in Stage if not self._is_done(stage)), None)
+
+    def missing_rankings(self) -> list[tuple[str, int]]:
+        """Return the (ranker, repeat) pairs `rank` still has to produce."""
+        repeats = self.read(MANIFEST).repeats
+        wanted = [(BASELINE, 0), *((LLM, repeat) for repeat in range(repeats))]
+        return [pair for pair in wanted if not self.exists(RANKING, pair)]
+
+    def _is_done(self, stage: Stage) -> bool:
         """Return whether the stage's final artifact exists."""
         match stage:
             case Stage.RESOLVE:
@@ -134,27 +168,8 @@ class RunDir:
             case Stage.SNAPSHOT:
                 return self.exists(SNAPSHOT)
             case Stage.RANK:
-                return self.is_done(Stage.RESOLVE) and self._all_rankings_exist()
+                return not self.missing_rankings()
             case Stage.LABEL:
                 return self.exists(LABELS)
             case Stage.SCORE:
                 return bool(self.keys(SCORES))
-
-    def _all_rankings_exist(self) -> bool:
-        repeats = self.read(MANIFEST).repeats
-        return self.exists(RANKING, (BASELINE, 0)) and all(
-            self.exists(RANKING, (LLM, repeat)) for repeat in range(repeats)
-        )
-
-    def state(self) -> RunState | None:
-        """Derive the Run's state from its artifacts, or None before it is planned."""
-        planned = (
-            self.is_done(Stage.RESOLVE) and self.is_done(Stage.SNAPSHOT) and self.exists(REQUESTS)
-        )
-        if not planned:
-            return None
-        if not self.is_done(Stage.RANK):
-            return RunState.PLANNED
-        if self.is_done(Stage.LABEL) and self.is_done(Stage.SCORE):
-            return RunState.SCORED
-        return RunState.RANKED
