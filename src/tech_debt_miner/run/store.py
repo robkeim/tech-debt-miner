@@ -55,10 +55,21 @@ def read_json(path: Path) -> Any:  # noqa: ANN401 - JSON has no static type; dec
 def append_jsonl(path: Path, data: object) -> None:
     """Append one JSON object as one line, so a crash damages at most the last line."""
     path.parent.mkdir(parents=True, exist_ok=True)
+    _drop_torn_tail(path)
     with path.open("a", encoding="utf-8") as handle:
         handle.write(canonical_json(data))
         handle.flush()
         os.fsync(handle.fileno())
+
+
+def _drop_torn_tail(path: Path) -> None:
+    """Cut a partial last line left by a crash, so the next append starts a clean line."""
+    if not path.exists():
+        return
+    raw = path.read_bytes()
+    if raw and not raw.endswith(b"\n"):
+        with path.open("r+b") as handle:
+            handle.truncate(raw.rfind(b"\n") + 1)
 
 
 def read_jsonl(path: Path) -> list[Any]:

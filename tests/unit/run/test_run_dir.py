@@ -40,6 +40,11 @@ def test_run_id_hash_depends_on_manifest_not_key_order() -> None:
     assert run_id(replace(MANIFEST, model="other"), NOW) != run_id(MANIFEST, NOW)
 
 
+def test_run_id_rejects_a_naive_clock() -> None:
+    with pytest.raises(ValueError, match="timezone-aware"):
+        run_id(MANIFEST, datetime(2026, 11, 24, 8, 30, 15))  # noqa: DTZ001 - the point of the test
+
+
 def test_run_id_uses_utc() -> None:
     local = datetime(2026, 11, 24, 3, 30, 15, tzinfo=UTC).astimezone()
     assert run_id(MANIFEST, local) == run_id(MANIFEST, NOW).replace("083015", "033015")

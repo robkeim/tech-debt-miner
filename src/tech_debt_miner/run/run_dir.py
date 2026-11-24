@@ -30,6 +30,9 @@ class RunState(StrEnum):
 
 def run_id(manifest: Manifest, now: datetime) -> str:
     """Return `<UTC-timestamp>-<8 hex of sha256 over the canonical manifest.json>`."""
+    if now.tzinfo is None:
+        msg = "the clock must return a timezone-aware datetime"
+        raise ValueError(msg)
     digest = hashlib.sha256(_manifest_text(manifest).encode("utf-8")).hexdigest()[:8]
     return f"{now.astimezone(UTC):%Y%m%dT%H%M%SZ}-{digest}"
 

@@ -37,6 +37,13 @@ def test_jsonl_drops_torn_last_line(tmp_path: Path) -> None:
     assert store.read_jsonl(path) == [{"n": 1}]
 
 
+def test_append_after_a_crash_starts_a_clean_line(tmp_path: Path) -> None:
+    path = tmp_path / "log.jsonl"
+    path.write_text('{"n":1}\n{"n":')
+    store.append_jsonl(path, {"n": 2})
+    assert store.read_jsonl(path) == [{"n": 1}, {"n": 2}]
+
+
 def test_snapshot_round_trip() -> None:
     snapshot = Snapshot(
         files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
