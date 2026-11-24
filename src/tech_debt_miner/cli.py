@@ -1,4 +1,4 @@
-"""The command line: `resolve` and `status` so far (ADR 0009)."""
+"""The command line: `resolve`, `label` and `status` so far (ADR 0009)."""
 
 import argparse
 import sys
@@ -7,6 +7,8 @@ from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
+from tech_debt_miner.repo import git
+from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
@@ -32,6 +34,17 @@ def _parser() -> argparse.ArgumentParser:
     resolve_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     resolve_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    label_cmd = commands.add_parser("label", help="count Fix commits once the window has closed")
+    label_cmd.add_argument("run_id")
+    label_cmd.add_argument(
+        "--max-files", type=int, default=None, help="fix-size cap N; omit for uncapped"
+    )
+    label_cmd.add_argument(
+        "--no-fetch", action="store_true", help="skip fast-forwarding the clone (offline use)"
+    )
+    label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     snapshot_cmd = commands.add_parser("snapshot", help="write snapshot.json for a Run")
     snapshot_cmd.add_argument("run_id")
     snapshot_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
@@ -47,6 +60,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "resolve":
         return _resolve(args)
+    if args.command == "label":
+        return _label(args)
     if args.command == "snapshot":
         return _snapshot(args)
     return _status(args)
@@ -78,6 +93,26 @@ def _snapshot(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 2
     snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
+    return 0
+
+
+def _label(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    deps = LabelDeps(
+        repos_dir=args.repos_dir,
+        clock=lambda: datetime.now(UTC),
+        update_clone=None if args.no_fetch else git.fast_forward,
+        max_files=args.max_files,
+    )
+    try:
+        label(run_dir, deps)
+    except (WindowOpenError, CloneUpdateError) as error:
+        print(error, file=sys.stderr)
+        return 1
     return 0
 
 

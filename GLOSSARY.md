@@ -44,7 +44,7 @@ A commit on the Target repo's default branch that is identified as a bug fix by 
 _Avoid_: Bug commit, fixing commit
 
 **Label**:
-The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date.
+The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date, counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Baseline**:

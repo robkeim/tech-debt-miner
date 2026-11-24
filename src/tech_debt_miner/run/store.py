@@ -120,7 +120,13 @@ def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
 
 
 def labels_from_json(data: Mapping[str, Any]) -> Labels:
-    return Labels(counts=dict(data["counts"]))
+    return Labels(
+        counts=dict(data["counts"]),
+        stats=dict(data.get("stats", {})),
+        clone_head=data.get("clone_head", ""),
+        clone_newest_commit=data.get("clone_newest_commit", ""),
+        fetched=data.get("fetched", False),
+    )
 
 
 def scores_from_json(data: Mapping[str, Any]) -> Scores:
