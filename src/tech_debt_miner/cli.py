@@ -1,4 +1,4 @@
-"""The command line: `resolve` and `status` so far (ADR 0009)."""
+"""The command line: `resolve`, `snapshot`, `rank` and `status` so far (ADR 0009)."""
 
 import argparse
 import sys
@@ -7,6 +7,8 @@ from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
+from tech_debt_miner.run.artifacts import SNAPSHOT
+from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
@@ -37,6 +39,10 @@ def _parser() -> argparse.ArgumentParser:
     snapshot_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     snapshot_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    rank_cmd = commands.add_parser("rank", help="write the Baseline ranking for a Run")
+    rank_cmd.add_argument("run_id")
+    rank_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
     status_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
@@ -49,6 +55,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _resolve(args)
     if args.command == "snapshot":
         return _snapshot(args)
+    if args.command == "rank":
+        return _rank(args)
     return _status(args)
 
 
@@ -78,6 +86,19 @@ def _snapshot(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 2
     snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
+    return 0
+
+
+def _rank(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    if not run_dir.exists(SNAPSHOT):
+        print(f"run {args.run_id} has no snapshot; run `snapshot` first", file=sys.stderr)
+        return 2
+    rank(run_dir)
     return 0
 
 
