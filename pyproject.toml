@@ -23,6 +23,7 @@ dev = [
     "pytest-randomly",
     "pytest-socket",
     "ruff",
+    "scikit-learn>=1.9.1",
     "time-machine",
     "zizmor",
 ]
