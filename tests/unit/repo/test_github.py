@@ -84,6 +84,19 @@ def test_issues_created_on_or_after_the_cutoff_are_never_returned() -> None:
     assert fake.pages == []  # it stopped at the first issue past the cutoff
 
 
+def test_paging_stops_at_the_cutoff_on_a_later_page() -> None:
+    fake = Fake(
+        page([node(1, "2023-01-01T00:00:00Z")], more=True),
+        page([node(2, "2024-02-01T00:00:00Z")], more=True),
+        page([node(3, "2024-03-01T00:00:00Z")]),
+    )
+
+    issues = fetch_issues("o/n", date(2024, 1, 1), fake, page_size=1)
+
+    assert [issue.number for issue in issues] == [1]
+    assert len(fake.sent) == 2  # the third page is never requested
+
+
 def test_paging_follows_the_cursor_until_the_last_page() -> None:
     fake = Fake(
         page([node(1, "2023-01-01T00:00:00Z")], more=True),

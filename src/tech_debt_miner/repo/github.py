@@ -82,8 +82,9 @@ def fetch_issues(
         )
         page = _page(response)
         parsed = [_parse_issue(node) for node in page["nodes"]]
-        issues += [issue for issue in parsed if issue.created_at < limit]
-        if len(issues) < len(parsed) or not page["pageInfo"]["hasNextPage"]:
+        before = [issue for issue in parsed if issue.created_at < limit]
+        issues += before
+        if len(before) < len(parsed) or not page["pageInfo"]["hasNextPage"]:
             # The page held an issue created on or after the Cutoff date, or was the last one.
             return issues
         after = page["pageInfo"]["endCursor"]
