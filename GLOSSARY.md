@@ -48,7 +48,7 @@ The per-file ground truth: the number of distinct Fix commits touching the file 
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Baseline**:
-The churn × complexity ranker the LLM is compared against, defined by [ADR 0006](docs/adr/0006-heuristic-baseline-definition.md).
+The churn × complexity ranker the LLM is compared against, defined by [ADR 0007](docs/adr/0007-heuristic-baseline-definition.md).
 _Avoid_: Heuristic (as a noun), control
 
 **Churn**:
