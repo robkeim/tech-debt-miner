@@ -74,3 +74,11 @@ _Avoid_: Completion, message (that is the SDK's type)
 **Snapshot**:
 The `snapshot.json` artifact: each Eligible file's lines of code, Churn and complexity as of the Cutoff date, plus the count of files whose complexity is 0 because they have no functions or `lizard` could not analyze them. Churn counts only commits that are ancestors of the Pinned SHA, so it covers exactly the tree the complexity comes from.
 _Avoid_: Facts, features
+
+**Tie group**:
+Files a ranker ranks equally. Scoring averages every metric over all orderings of each tie group, never by path name ([ADR 0005](docs/adr/0005-scoring-pre-registration.md)).
+_Avoid_: Bucket, tied set
+
+**Effort map**:
+The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0017](docs/adr/0017-recall-budget-and-effort-map.md)).
+_Avoid_: LOC map, size map
