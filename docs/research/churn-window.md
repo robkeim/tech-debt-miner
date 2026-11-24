@@ -84,7 +84,6 @@ Research notes for the heuristic baseline (churn x complexity hotspots). Gathere
 - Bangash et al., "On the Time-Based Conclusion Stability of Cross-Project Defect Prediction Models" <https://arxiv.org/pdf/1911.06348v3.pdf> (abstract read): defect predictor performance varies depending on which time period is evaluated.
 - Majumder et al., "Revisiting process versus product metrics" <https://arxiv.org/pdf/2008.09569> (text skimmed): uses release-based and JIT validation across 700 GitHub projects (train on releases 1 to R-3, test on the last three). It does not choose a calendar window.
 - Yatish, Jiarpakdee, Thongtanunam, Tantithamthavorn, "Mining Software Defects: Should We Consider Affected Releases?" (ICSE 2019), DOI 10.1109/ICSE.2019.00075 (abstract via search result only): the common heuristic of labeling post-release defects by a fixed window after release (typically six months) mislabels data compared with affected-release data. This concerns the outcome window, not the churn window, but it is the most direct evidence that fixed 6-month windows are a convention with measurable error.
-- I did not find a Tantithamthavorn paper that studies the window length of process metrics or "long-term effects" directly; a later pass also found none. See "Second-pass checks".
 
 ## Commit count as churn
 
@@ -134,8 +133,3 @@ Corrected:
 
 - **Moser et al. 2008:** the paper does not state a six-month window. It uses the Zimmermann PROMISE data for Eclipse 2.0, 2.1 and 3.0 (post-release, file-level defects) with 18 change metrics, including REVISIONS, REFACTORINGS, BUGFIXES, AUTHORS, LOC_ADDED/DELETED, CODECHURN, CHANGESET, AGE and WEIGHTED_AGE. AGE is measured in weeks back from the release date. Whether the six months comes from the Zimmermann data is unchecked, and the text came from a summarizer over a SciSpace copy.
 - **Jahanshahi et al.:** PROMISE 2019, pp. 90-99. It contradicts McIntosh and Kamei: predictive power does not significantly decline over time, and all-data models beat short-period models. It still recommends weighted sampling of recent data, mainly for calibration. Read through a summarizer of the arXiv version.
-
-Not found:
-
-- **Tantithamthavorn on process-metric window length:** no such paper. The nearest is Yatish et al., which covers the outcome window rather than the churn window.
-- **Page numbers and direct-quote checks:** not attempted.
