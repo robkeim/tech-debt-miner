@@ -1,14 +1,27 @@
-"""The command line: `resolve`, `label` and `status` so far (ADR 0009)."""
+"""The command line: `resolve`, `snapshot`, `label`, `probe` and `status` so far (ADR 0009)."""
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
+from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 
+from tech_debt_miner.llm.client import (
+    DEFAULT_MAX_USD,
+    AnthropicTransport,
+    DryRunError,
+    DryRunTransport,
+    LLMClient,
+    LLMError,
+    load_api_key,
+)
 from tech_debt_miner.repo import git
+from tech_debt_miner.run.artifacts import RESPONSES
 from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
+from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
@@ -50,6 +63,15 @@ def _parser() -> argparse.ArgumentParser:
     snapshot_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     snapshot_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    probe_cmd = commands.add_parser(
+        "probe", help="ask the model to name a buggy file from a post-Cutoff Fix commit message"
+    )
+    probe_cmd.add_argument("run_id")
+    probe_cmd.add_argument("--run", action="store_true", help="send the call; default is Dry-run")
+    probe_cmd.add_argument("--max-usd", type=float, default=DEFAULT_MAX_USD)
+    probe_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    probe_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
     status_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
@@ -64,6 +86,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _label(args)
     if args.command == "snapshot":
         return _snapshot(args)
+    if args.command == "probe":
+        return _probe(args)
     return _status(args)
 
 
@@ -113,6 +137,35 @@ def _label(args: argparse.Namespace) -> int:
     except (WindowOpenError, CloneUpdateError) as error:
         print(error, file=sys.stderr)
         return 1
+    return 0
+
+
+def _probe(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    try:
+        # Dry-run logs nothing: its raiser would otherwise leave an error row in the log.
+        client = (
+            LLMClient(
+                AnthropicTransport(load_api_key(os.environ, Path(".env"))),
+                max_usd=args.max_usd,
+                log=partial(run_dir.append, RESPONSES),
+            )
+            if args.run
+            else LLMClient(DryRunTransport(), max_usd=args.max_usd)
+        )
+        deps = ProbeDeps(repos_dir=args.repos_dir, client=client, today=datetime.now(UTC).date())
+        result = run_probe(run_dir, deps)
+    except DryRunError:
+        print("Dry-run: no call was made; pass --run to send it")
+        return 0
+    except (WindowOpenError, NoProbeCommitError, LLMError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    print("hit" if result.hit else "miss")
     return 0
 
 

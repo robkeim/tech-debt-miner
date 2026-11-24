@@ -91,3 +91,13 @@ class Response:
     stop_reason: str
     request_id: str
     model: str  # the model snapshot the provider says it served
+
+
+@dataclass(frozen=True)
+class Probe:
+    """The behavioral canary probe's result for one Run (ADR 0006). Never part of the verdict."""
+
+    commit: str  # the post-Cutoff Fix commit whose message was sent
+    expected_path: str  # the one eligible file that commit changed
+    answer: str  # the path the model named; empty when the reply was unusable
+    hit: bool  # the answer is exactly the expected path

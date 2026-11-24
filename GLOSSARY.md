@@ -74,3 +74,7 @@ _Avoid_: Completion, message (that is the SDK's type)
 **Snapshot**:
 The `snapshot.json` artifact: each Eligible file's lines of code, Churn and complexity as of the Cutoff date, plus the count of files whose complexity is 0 because they have no functions or `lizard` could not analyze them. Churn counts only commits that are ancestors of the Pinned SHA, so it covers exactly the tree the complexity comes from.
 _Avoid_: Facts, features
+
+**Canary probe**:
+The once-per-Run check that asks the model to name the file changed by one post-Cutoff Fix commit, from its message alone with no repo context, written to `probe.json`. A hit suggests memorization. Reported beside results, never in the verdict ([ADR 0006](docs/adr/0006-target-repos-and-cutoff-dates.md)).
+_Avoid_: Memorization test, contamination check

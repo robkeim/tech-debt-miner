@@ -11,7 +11,7 @@ from enum import StrEnum
 from typing import Any
 
 from tech_debt_miner.run import store
-from tech_debt_miner.types import Labels, Manifest, Ranking, Request, Scores, Snapshot
+from tech_debt_miner.types import Labels, Manifest, Probe, Ranking, Request, Scores, Snapshot
 
 BASELINE = "baseline"
 
@@ -67,6 +67,9 @@ COST = Artifact[Mapping[str, float], None](
 LABELS = Artifact[Labels, None](
     "labels", _fixed("labels.json"), store.to_json, store.labels_from_json, Policy.REPLACE
 )
+PROBE = Artifact[Probe, None](
+    "probe", _fixed("probe.json"), store.to_json, store.probe_from_json, Policy.CREATE_ONCE
+)
 
 
 def _ranking_path(key: tuple[str, int]) -> str:
@@ -106,6 +109,7 @@ ALL: tuple[Artifact[Any, Any], ...] = (
     RESPONSES,
     COST,
     LABELS,
+    PROBE,
     RANKING,
     SCORES,
 )
