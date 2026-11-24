@@ -8,7 +8,7 @@ from pathlib import Path
 from tech_debt_miner import labels
 from tech_debt_miner.repo import git
 from tech_debt_miner.repo.history import CommitChange, GitError
-from tech_debt_miner.run.artifacts import LABELS, MANIFEST
+from tech_debt_miner.run.artifacts import LABELS, MANIFEST, VALIDATION
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import Labels
 
@@ -19,6 +19,10 @@ class WindowOpenError(RuntimeError):
 
 class CloneUpdateError(RuntimeError):
     """The Target repo clone could not be fast-forwarded, e.g. upstream history was rewritten."""
+
+
+class CapMismatchError(ValueError):
+    """`--max-files` differs from the N that `validate` fixed for the Run."""
 
 
 @dataclass(frozen=True)
@@ -77,6 +81,12 @@ def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
     if run_dir.exists(LABELS):
         msg = f"{LABELS.path(None)} already exists; N is fixed before any scored Run"
         raise FileExistsError(msg)
+    if run_dir.exists(VALIDATION) and run_dir.read(VALIDATION).cap_n != deps.max_files:
+        msg = (
+            f"--max-files must be the N in validation.json ({run_dir.read(VALIDATION).cap_n}); "
+            "N is fixed before any scored Run"
+        )
+        raise CapMismatchError(msg)
     window = read_window(run_dir, deps)
     result = labels.build_labels(window.commits, window.cutoff_files, deps.max_files)
     result = replace(

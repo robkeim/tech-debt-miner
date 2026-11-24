@@ -9,7 +9,7 @@ from tech_debt_miner import cli
 from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.repo.git import resolve_pinned_sha
 from tech_debt_miner.run.artifacts import LABELS, MANIFEST, VALIDATION
-from tech_debt_miner.run.label import LabelDeps, WindowOpenError
+from tech_debt_miner.run.label import CapMismatchError, LabelDeps, WindowOpenError, label
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.validate import render, validate
 from tech_debt_miner.types import Manifest
@@ -210,3 +210,43 @@ def test_diff_stat_is_the_stat_without_the_message(repos_dir: Path) -> None:
     assert "w0.py" in stat
     assert "12 files changed" in stat
     assert "fix wide change" not in stat
+
+
+def test_label_must_use_the_n_that_validate_fixed(tmp_path: Path, repos_dir: Path) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    validate(run_dir, deps_for(repos_dir))
+
+    for wrong in (None, 5):
+        deps = LabelDeps(
+            repos_dir=repos_dir, clock=lambda: AFTER_WINDOW, update_clone=None, max_files=wrong
+        )
+        with pytest.raises(CapMismatchError, match=r"validation.json \(1\)"):
+            label(run_dir, deps)
+    assert not run_dir.exists(LABELS)
+
+    deps = LabelDeps(
+        repos_dir=repos_dir, clock=lambda: AFTER_WINDOW, update_clone=None, max_files=1
+    )
+    assert label(run_dir, deps).stats["fix_commits_dropped_by_cap"] == 1
+
+
+def test_cli_label_reports_a_wrong_n(
+    tmp_path: Path,
+    repos_dir: Path,
+    frozen_clock: time_machine.Traveller,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    frozen_clock.move_to(AFTER_WINDOW)
+    run_dir = make_run(tmp_path, repos_dir)
+    validate(run_dir, deps_for(repos_dir))
+    argv = [
+        "label",
+        run_dir.id,
+        "--repos-dir",
+        str(repos_dir),
+        "--runs-dir",
+        str(tmp_path / "runs"),
+    ]
+
+    assert cli.main([*argv, "--no-fetch"]) == 1
+    assert "must be the N" in capsys.readouterr().err

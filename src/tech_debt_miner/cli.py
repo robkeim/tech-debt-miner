@@ -9,7 +9,13 @@ from pathlib import Path
 
 from tech_debt_miner.repo import git
 from tech_debt_miner.run.artifacts import MANIFEST
-from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
+from tech_debt_miner.run.label import (
+    CapMismatchError,
+    CloneUpdateError,
+    LabelDeps,
+    WindowOpenError,
+    label,
+)
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
@@ -124,7 +130,7 @@ def _label(args: argparse.Namespace) -> int:
     )
     try:
         label(run_dir, deps)
-    except (WindowOpenError, CloneUpdateError) as error:
+    except (WindowOpenError, CloneUpdateError, CapMismatchError) as error:
         print(error, file=sys.stderr)
         return 1
     return 0

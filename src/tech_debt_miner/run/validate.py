@@ -87,7 +87,7 @@ def render(manifest: Manifest, validation: Validation) -> str:
             f"### {number}. {item.sha}",
             "",
             f"- Issue references: {references}",
-            f"- Filtered files: {', '.join(item.files)}",
+            f"- Eligible files: {', '.join(item.files)}",
             "- Real fix: yes / no",
             "",
             "```text",
