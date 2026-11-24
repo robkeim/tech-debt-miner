@@ -63,9 +63,18 @@ flowchart TB
 - Layering is a convention until a policy test enforces it.
 - Splitting `repo/` further, or moving `prompts/` next to `rankers/llm.py`, is cheap later and not decided here.
 
+## Addendum: pure git history rules
+
+The "git runner" in `deps` is not a separate collaborator. `repo/git.py` is the only code that runs `git`, and it keeps one private subprocess runner. Parsing (`repo/history.py`) and the Cutoff date rules (`repo/cutoff.py`) are pure functions over parsed commits, so the boundary rules are unit tested without a repo. This is not a new seam: real git is the only adapter. Pinning reads the whole commit graph with one `git log` and trades memory on very large repos for a bounded number of git calls.
+
 ## Alternatives rejected
 
 - **A `Stage` class hierarchy or plugin registry.** Five fixed stages do not need one.
 - **Types that serialize themselves.** It couples every leaf module to the on-disk format.
 - **pydantic.** A dependency for validation the tool does not need, since it only reads files it wrote.
 - **A config file of Target repos.** ADR 0006 already freezes the list, and a batch runner can come later.
+
+## Amendments
+
+- 2026-11-24: [ADR 0015](0015-run-artifacts-are-a-codec-table.md) refines the "One `RunDir` class" rule. `RunDir` still owns every artifact path and does the atomic writes; its interface is now `read`, `write`, `append` and friends over the artifact table in `run/artifacts.py`.
+- 2026-11-24: Two rules are relaxed. A leaf module may import `types` and the pure `repo` modules (`history`, `cutoff`, `eligibility`), never `repo/git.py` or anything that runs a subprocess; `tests/policy/test_layering.py` enforces this for the leaf modules that conform today. And the `label` stage fast-forwards its Target repo clone before reading it (fast-forward only, skipped with `--no-fetch`), because a clone made at `resolve` time lacks the closed Label window; `labels.json` records the clone's HEAD, its newest commit date and whether an update ran.

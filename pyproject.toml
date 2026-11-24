@@ -5,7 +5,10 @@ description = "Backtest whether an LLM can rank files by technical-debt risk bet
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
-dependencies = ["lizard"]
+dependencies = [
+    "anthropic>=2.14.0",
+    "lizard",
+]
 
 [project.scripts]
 gate = "gate.cli:main"
@@ -23,6 +26,7 @@ dev = [
     "pytest-randomly",
     "pytest-socket",
     "ruff",
+    "scikit-learn>=1.9.1",
     "time-machine",
     "zizmor",
 ]
@@ -53,6 +57,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/gate/cli.py" = ["T201"] # the CLI's job is to print
+"src/tech_debt_miner/cli.py" = ["T201"] # the CLI's job is to print
 "tests/**" = [
     "INP001", # test dirs are namespace packages; importlib mode and `pythonpath` find them
     "S101",   # assert is how pytest tests assert

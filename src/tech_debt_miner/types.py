@@ -40,6 +40,7 @@ class Issue:
 class Snapshot:
     files: tuple[FileFacts, ...]
     issues: tuple[Issue, ...]
+    zero_complexity_files: int  # files scored 0: no functions, or lizard could not analyze
 
 
 @dataclass(frozen=True)
@@ -68,8 +69,25 @@ class Labels:
     stats: Mapping[str, float] = field(
         default_factory=dict[str, float]
     )  # ADR 0004 reporting figures
+    # Where the counts came from: the clone's HEAD, its newest commit date (ISO 8601) and
+    # whether the clone was fast-forwarded first.
+    clone_head: str = ""
+    clone_newest_commit: str = ""
+    fetched: bool = False
 
 
 @dataclass(frozen=True)
 class Scores:
     metrics: Mapping[str, float]  # metric name -> value
+
+
+@dataclass(frozen=True)
+class Response:
+    """One LLM reply in provider-neutral form. No SDK object ever leaves `llm/client.py`."""
+
+    text: str
+    input_tokens: int
+    output_tokens: int
+    stop_reason: str
+    request_id: str
+    model: str  # the model snapshot the provider says it served

@@ -6,8 +6,10 @@ import time_machine
 
 from support.fixture_repo import Commit, build_fixture_repo, git
 from tech_debt_miner import cli
+from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.repo.git import resolve_pinned_sha
-from tech_debt_miner.run.label import LabelDeps, WindowOpenError, label
+from tech_debt_miner.run.artifacts import LABELS
+from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import Manifest
 
@@ -86,7 +88,9 @@ def make_run(tmp_path: Path, repos_dir: Path) -> RunDir:
 
 
 def deps_for(repos_dir: Path, max_files: int | None = None) -> LabelDeps:
-    return LabelDeps(repos_dir=repos_dir, clock=lambda: AFTER_WINDOW, max_files=max_files)
+    return LabelDeps(
+        repos_dir=repos_dir, clock=lambda: AFTER_WINDOW, update_clone=None, max_files=max_files
+    )
 
 
 def test_label_counts_fix_commits_in_the_window_and_writes_labels_json(
@@ -96,7 +100,7 @@ def test_label_counts_fix_commits_in_the_window_and_writes_labels_json(
 
     result = label(run_dir, deps_for(repos_dir))
 
-    assert run_dir.read_labels() == result
+    assert run_dir.read(LABELS) == result
     # a: "fix a" and the wide fix and the last-day fix. The bot, the cutoff-day and the
     # after-window commits do not count. b: moved, then fixed. c: deleted by a fix.
     assert dict(result.counts) == {"a.py": 3, "b.py": 1, "c.py": 1}
@@ -129,7 +133,7 @@ def test_label_never_reads_the_cutoff_day_or_later_than_the_window(
 
     label(run_dir, deps_for(repos_dir))
 
-    assert POISON not in run_dir.labels_path.read_text(encoding="utf-8")
+    assert POISON not in (run_dir.path / "labels.json").read_text(encoding="utf-8")
 
 
 @pytest.mark.parametrize("today", [date(2024, 1, 15), date(2024, 7, 1)])
@@ -138,13 +142,15 @@ def test_label_refuses_until_the_window_has_closed(
 ) -> None:
     run_dir = make_run(tmp_path, repos_dir)
     deps = LabelDeps(
-        repos_dir=repos_dir, clock=lambda: datetime(today.year, today.month, today.day, tzinfo=UTC)
+        repos_dir=repos_dir,
+        clock=lambda: datetime(today.year, today.month, today.day, tzinfo=UTC),
+        update_clone=None,
     )
 
     with pytest.raises(WindowOpenError, match="2024-07-01"):
         label(run_dir, deps)
 
-    assert not run_dir.labels_path.exists()
+    assert not run_dir.exists(LABELS)
 
 
 def test_label_never_overwrites_an_existing_labels_file(tmp_path: Path, repos_dir: Path) -> None:
@@ -157,11 +163,97 @@ def test_label_never_overwrites_an_existing_labels_file(tmp_path: Path, repos_di
 
 def test_label_runs_on_the_first_day_after_the_window(tmp_path: Path, repos_dir: Path) -> None:
     run_dir = make_run(tmp_path, repos_dir)
-    deps = LabelDeps(repos_dir=repos_dir, clock=lambda: datetime(2024, 7, 2, tzinfo=UTC))
+    deps = LabelDeps(
+        repos_dir=repos_dir, clock=lambda: datetime(2024, 7, 2, tzinfo=UTC), update_clone=None
+    )
 
     label(run_dir, deps)
 
-    assert run_dir.labels_path.exists()
+    assert run_dir.exists(LABELS)
+
+
+@pytest.fixture
+def remote(tmp_path: Path, repos_dir: Path) -> Path:
+    """Return a local bare repo for clones to fetch from. No network is involved."""
+    bare = tmp_path / "remote.git"
+    git(tmp_path, "clone", "--quiet", "--bare", str(repos_dir / "target"), str(bare))
+    return bare
+
+
+@pytest.fixture
+def clones_dir(tmp_path: Path, remote: Path) -> Path:
+    repo_git.clone_repo(str(remote), tmp_path / "clones" / "target")
+    return tmp_path / "clones"
+
+
+def push_fix(upstream: Path, remote: Path, *, force: bool = False) -> None:
+    add_commit(upstream, "fix a again", {"a.py": BODY + "# 6\n"}, at(2024, 6, 1))
+    git(upstream, "push", "--quiet", *(["--force"] if force else []), str(remote), "main")
+
+
+def fast_forward_deps(clones_dir: Path) -> LabelDeps:
+    return LabelDeps(
+        repos_dir=clones_dir,
+        clock=lambda: AFTER_WINDOW,
+        update_clone=repo_git.fast_forward,
+    )
+
+
+def test_label_fast_forwards_the_clone_and_records_its_source(
+    tmp_path: Path, repos_dir: Path, remote: Path, clones_dir: Path
+) -> None:
+    upstream = repos_dir / "target"
+    push_fix(upstream, remote)
+    run_dir = make_run(tmp_path, repos_dir)
+
+    result = label(run_dir, fast_forward_deps(clones_dir))
+
+    assert result.counts["a.py"] == 4
+    assert result.fetched is True
+    assert result.clone_head == git(upstream, "rev-parse", "HEAD").strip()
+    assert result.clone_newest_commit == at(2024, 6, 1).isoformat()
+    assert run_dir.read(LABELS) == result
+
+
+def test_label_without_an_update_reads_the_clone_as_it_is(
+    tmp_path: Path, repos_dir: Path, remote: Path, clones_dir: Path
+) -> None:
+    push_fix(repos_dir / "target", remote)
+    run_dir = make_run(tmp_path, repos_dir)
+    deps = LabelDeps(repos_dir=clones_dir, clock=lambda: AFTER_WINDOW, update_clone=None)
+
+    result = label(run_dir, deps)
+
+    assert result.counts["a.py"] == 3
+    assert result.fetched is False
+    assert result.clone_head == repo_git.head_sha(clones_dir / "target")
+
+
+def test_label_refuses_when_upstream_history_was_rewritten(
+    tmp_path: Path, repos_dir: Path, remote: Path, clones_dir: Path
+) -> None:
+    upstream = repos_dir / "target"
+    git(upstream, "reset", "--quiet", "--hard", "HEAD~1")
+    push_fix(upstream, remote, force=True)
+    run_dir = make_run(tmp_path, repos_dir)
+
+    with pytest.raises(CloneUpdateError, match="--no-fetch"):
+        label(run_dir, fast_forward_deps(clones_dir))
+
+    assert not run_dir.exists(LABELS)
+
+
+def test_window_check_comes_before_any_update(tmp_path: Path, repos_dir: Path) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+
+    def explode(_repo: Path) -> None:
+        raise AssertionError("the clone was updated")  # noqa: EM101, TRY003
+
+    deps = LabelDeps(
+        repos_dir=repos_dir, clock=lambda: datetime(2024, 3, 1, tzinfo=UTC), update_clone=explode
+    )
+    with pytest.raises(WindowOpenError):
+        label(run_dir, deps)
 
 
 def test_cli_label_writes_labels_once_the_window_has_closed(
@@ -178,10 +270,11 @@ def test_cli_label_writes_labels_once_the_window_has_closed(
         str(tmp_path / "runs"),
         "--max-files",
         "2",
+        "--no-fetch",
     ]
 
     assert cli.main(argv) == 0
-    assert run_dir.read_labels().stats["fix_commits_dropped_by_cap"] == 1
+    assert run_dir.read(LABELS).stats["fix_commits_dropped_by_cap"] == 1
 
 
 def test_cli_label_refuses_while_the_window_is_open(
@@ -200,7 +293,7 @@ def test_cli_label_refuses_while_the_window_is_open(
     # The autouse clock is frozen at 2024-01-15, so the window is open.
     assert cli.main(argv) == 1
     assert "closes after 2024-07-01" in capsys.readouterr().err
-    assert not run_dir.labels_path.exists()
+    assert not run_dir.exists(LABELS)
 
 
 def test_cli_label_of_an_unknown_run_fails(

@@ -10,7 +10,7 @@ from collections.abc import Collection, Sequence
 from datetime import date, timedelta
 
 from tech_debt_miner.repo.eligibility import is_eligible
-from tech_debt_miner.repo.git import CommitChange
+from tech_debt_miner.repo.history import CommitChange
 from tech_debt_miner.types import Labels
 
 WINDOW_MONTHS = 6  # ADR 0005

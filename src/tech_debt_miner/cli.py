@@ -7,9 +7,11 @@ from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
-from tech_debt_miner.run.label import LabelDeps, WindowOpenError, label
+from tech_debt_miner.repo import git
+from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
-from tech_debt_miner.run.run_dir import RunDir
+from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
+from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K, June 30 2026 (ADR 0006)
@@ -37,8 +39,16 @@ def _parser() -> argparse.ArgumentParser:
     label_cmd.add_argument(
         "--max-files", type=int, default=None, help="fix-size cap N; omit for uncapped"
     )
+    label_cmd.add_argument(
+        "--no-fetch", action="store_true", help="skip fast-forwarding the clone (offline use)"
+    )
     label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
+    snapshot_cmd = commands.add_parser("snapshot", help="write snapshot.json for a Run")
+    snapshot_cmd.add_argument("run_id")
+    snapshot_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    snapshot_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
@@ -52,6 +62,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _resolve(args)
     if args.command == "label":
         return _label(args)
+    if args.command == "snapshot":
+        return _snapshot(args)
     return _status(args)
 
 
@@ -70,33 +82,47 @@ def _resolve(args: argparse.Namespace) -> int:
         lizard_version=version("lizard"),
         clock=lambda: datetime.now(UTC),
     )
-    print(resolve(inputs, deps).id)  # noqa: T201 - the CLI's job is to print
+    print(resolve(inputs, deps).id)
+    return 0
+
+
+def _snapshot(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
     return 0
 
 
 def _label(args: argparse.Namespace) -> int:
-    run_dir = RunDir(args.runs_dir / args.run_id)
-    if not run_dir.manifest_path.exists():
-        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
         return 2
     deps = LabelDeps(
-        repos_dir=args.repos_dir, clock=lambda: datetime.now(UTC), max_files=args.max_files
+        repos_dir=args.repos_dir,
+        clock=lambda: datetime.now(UTC),
+        update_clone=None if args.no_fetch else git.fast_forward,
+        max_files=args.max_files,
     )
     try:
         label(run_dir, deps)
-    except WindowOpenError as error:
-        print(error, file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+    except (WindowOpenError, CloneUpdateError) as error:
+        print(error, file=sys.stderr)
         return 1
     return 0
 
 
 def _status(args: argparse.Namespace) -> int:
-    run_dir = RunDir(args.runs_dir / args.run_id)
-    if not run_dir.manifest_path.exists():
-        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
         return 2
-    state = run_dir.state()
-    print(state.value if state else "resolved")  # noqa: T201 - the CLI's job is to print
+    print(run_dir.state().value)
     return 0
 
 

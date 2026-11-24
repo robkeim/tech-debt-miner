@@ -107,6 +107,7 @@ def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
     return Snapshot(
         files=tuple(FileFacts(**file) for file in data["files"]),
         issues=tuple(Issue(**issue) for issue in data["issues"]),
+        zero_complexity_files=data["zero_complexity_files"],
     )
 
 
@@ -119,7 +120,13 @@ def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
 
 
 def labels_from_json(data: Mapping[str, Any]) -> Labels:
-    return Labels(counts=dict(data["counts"]), stats=dict(data.get("stats", {})))
+    return Labels(
+        counts=dict(data["counts"]),
+        stats=dict(data.get("stats", {})),
+        clone_head=data.get("clone_head", ""),
+        clone_newest_commit=data.get("clone_newest_commit", ""),
+        fetched=data.get("fetched", False),
+    )
 
 
 def scores_from_json(data: Mapping[str, Any]) -> Scores:

@@ -212,3 +212,15 @@ def test_list_commits_marks_deleted_files(repo: Path) -> None:
 
 def test_list_files_returns_the_tree_at_a_sha(repo: Path) -> None:
     assert sorted(repo_git.list_files(repo, shas(repo)[3])) == ["a.py", "new.py"]
+
+
+def test_list_commits_from_a_rev_skips_commits_that_are_not_its_ancestors(repo: Path) -> None:
+    first, second = shas(repo)[:2]
+
+    from_first = repo_git.list_commits(repo, date(2023, 1, 1), CUTOFF, rev=first)
+    from_second = repo_git.list_commits(repo, date(2023, 1, 1), CUTOFF, rev=second)
+    from_head = repo_git.list_commits(repo, date(2023, 1, 1), CUTOFF)
+
+    assert [c.sha for c in from_first] == [first]
+    assert [c.sha for c in from_second] == [second, first]
+    assert len(from_head) == 4

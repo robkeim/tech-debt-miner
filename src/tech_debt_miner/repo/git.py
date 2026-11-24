@@ -1,8 +1,8 @@
 """The only code that shells out to `git` (ADR 0009).
 
-A Target repo is cloned once and then only read. Every as-of function treats the Cutoff date as
-midnight UTC and uses committer dates, so a commit dated on or after the Cutoff date is never
-returned.
+A Target repo is cloned once and read; only `fast_forward` (the `label` stage) updates it.
+Every as-of function treats the Cutoff date as midnight UTC and uses committer dates, so a
+commit dated on or after the Cutoff date is never returned.
 """
 
 import io
@@ -12,34 +12,20 @@ import tarfile
 import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from pathlib import Path
 
+from tech_debt_miner.repo.cutoff import commits_in_range, pick_pinned_sha
+from tech_debt_miner.repo.history import (
+    COMMIT_LOG_FORMAT,
+    CommitChange,
+    FileChange,
+    GitError,
+    parse_commit_log,
+    parse_graph_log,
+)
 
-class GitError(RuntimeError):
-    """A git command failed or the repo has no history as of the requested date."""
-
-
-@dataclass(frozen=True)
-class FileChange:
-    """One path touched by a commit. `old_path` is set only when the file was renamed."""
-
-    path: str
-    old_path: str | None = None
-    deleted: bool = False
-
-
-@dataclass(frozen=True)
-class CommitChange:
-    """A non-merge commit with its committer time, author, message and the paths it touched."""
-
-    sha: str
-    committed_at: datetime
-    files: tuple[FileChange, ...]
-    author_name: str = ""
-    author_email: str = ""
-    message: str = ""
+__all__ = ["CommitChange", "FileChange", "GitError"]
 
 
 def _git(*args: str, cwd: Path | None = None) -> bytes:
@@ -60,10 +46,6 @@ def _git(*args: str, cwd: Path | None = None) -> bytes:
         msg = f"git {' '.join(args)} failed: {stderr}"
         raise GitError(msg)
     return result.stdout
-
-
-def _midnight_utc(day: date) -> datetime:
-    return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
 def clone_repo(url: str, dest: Path) -> Path:
@@ -89,73 +71,37 @@ def last_commit_touching(repo: Path, path: str) -> str:
 
 
 def resolve_pinned_sha(repo: Path, cutoff: date) -> str:
-    """Return the newest first-parent commit before the Cutoff date whose history is all earlier.
-
-    A candidate is committed before the Cutoff date and has no ancestor committed on or after it
-    (for example a late-dated side-branch commit that was merged in, or clock skew). If a
-    candidate fails that check, step back along the first-parent line to the next earlier
-    candidate and check again. This walks the full ancestry of each candidate tried.
-    """
-    limit = _midnight_utc(cutoff).timestamp()
-    out = _git("log", "--first-parent", "--format=%H %ct", "HEAD", cwd=repo).decode()
-    for line in out.splitlines():
-        sha, stamp = line.split()
-        if int(stamp) < limit and _newest_commit_time(repo, sha) < limit:
-            return sha
-    msg = f"no commit before {cutoff.isoformat()} with only earlier history"
-    raise GitError(msg)
+    """Return the newest first-parent commit before the Cutoff date whose history is all earlier."""
+    out = _git("log", "--format=%H %ct %P", "HEAD", cwd=repo).decode()
+    return pick_pinned_sha(parse_graph_log(out), cutoff)
 
 
-def _newest_commit_time(repo: Path, sha: str) -> int:
-    """Return the latest committer time among `sha` and all its ancestors."""
-    out = _git("log", "--format=%ct", sha, cwd=repo).decode()
-    return max(int(stamp) for stamp in out.split())
+def list_commits(repo: Path, since: date, until: date, rev: str = "HEAD") -> list[CommitChange]:
+    """Non-merge commits reachable from `rev` committed in `[since, until)`, newest first.
 
-
-def list_commits(repo: Path, since: date, until: date) -> list[CommitChange]:
-    """Non-merge commits on the default branch committed in `[since, until)`, newest first.
+    `rev` defaults to `HEAD`, the default branch. Pass the Pinned SHA to count only the ancestors
+    of the tree being analyzed.
 
     Renames are detected, so a renamed file carries its `old_path`. Pass the Cutoff date as
     `until` for as-of history. Nothing here clamps `until`: the caller owns keeping a window off
     post-Cutoff commits.
     """
-    start = _midnight_utc(since).timestamp()
-    end = _midnight_utc(until).timestamp()
     out = _git(
-        "log",
-        "--no-merges",
-        "-M",
-        "--name-status",
-        "--format=%x00%H%x01%ct%x01%an%x01%ae%x01%B%x01",
-        "HEAD",
-        cwd=repo,
+        "log", "--no-merges", "-M", "--name-status", f"--format={COMMIT_LOG_FORMAT}", rev, cwd=repo
     ).decode()
-    commits: list[CommitChange] = []
-    for block in out.split("\0")[1:]:
-        sha, stamp, name, email, message, status = block.split("\x01")
-        if not start <= int(stamp) < end:
-            continue
-        files = tuple(_file_change(line) for line in status.splitlines() if line)
-        commits.append(
-            CommitChange(
-                sha,
-                datetime.fromtimestamp(int(stamp), UTC),
-                files,
-                author_name=name,
-                author_email=email,
-                message=message.strip(),
-            )
-        )
-    return commits
+    return commits_in_range(parse_commit_log(out), since, until)
 
 
-def _file_change(line: str) -> FileChange:
-    status, *paths = line.split("\t")
-    if status.startswith("R"):
-        return FileChange(path=paths[1], old_path=paths[0])
-    if status == "D":
-        return FileChange(path=paths[0], deleted=True)
-    return FileChange(path=paths[0])
+def fast_forward(repo: Path) -> None:
+    """Fetch the clone's upstream and fast-forward to it, or raise GitError if it cannot."""
+    _git("fetch", "--quiet", cwd=repo)
+    _git("merge", "--ff-only", "--quiet", "@{upstream}", cwd=repo)
+
+
+def head_committed_at(repo: Path) -> datetime:
+    """Return the committer time of `HEAD`."""
+    stamp = _git("log", "-1", "--format=%ct", "HEAD", cwd=repo).decode().strip()
+    return datetime.fromtimestamp(int(stamp), UTC)
 
 
 def list_files(repo: Path, sha: str) -> list[str]:

@@ -18,7 +18,9 @@ Write an ADR only when a decision is hard to reverse, surprising without context
 
 - Number ADRs sequentially: `docs/adr/NNNN-short-title.md`.
 - Each ADR has a one-line status: `Accepted` or `Superseded by NNNN`.
-- Never edit an accepted ADR except for typos. To reverse a decision, write a new ADR and mark the old one superseded.
+- Never change an accepted ADR's decision text, except for typos.
+- A later ADR may be pointed to from an older one: add a dated note under a trailing `## Amendments` heading, such as "Refined by ADR 0015: the `RunDir` interface changed." Existing text stays untouched.
+- To reverse a decision, write a new ADR and mark the old one `Superseded by NNNN`.
 
 ## Docs check
 
