@@ -64,5 +64,5 @@ The at most 100 files the LLM ranker's triage stage selects from a digest of eve
 _Avoid_: Shortlist (ADR 0005 uses that word for the ranked output)
 
 **Eligible file**:
-A `*.py` source file that is not a test, doc, generated or vendored file, decided by path alone ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The ranked set and the Label both use only eligible files.
+A `*.py` source file that is not a test, doc, generated or vendored file, decided by path alone, ignoring case ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The ranked set and the Label both use only eligible files.
 _Avoid_: Source file (unqualified), candidate

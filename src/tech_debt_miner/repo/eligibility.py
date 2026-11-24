@@ -4,9 +4,10 @@ One filter serves the ranked set and the Label, so both see the same files. Ever
 pure: it takes paths and file contents and never touches a repo.
 
 A path is eligible when it is a `*.py` source file that is not a test, doc, generated or vendored
-file. Matching is by path only, on POSIX-style paths relative to the repo root. Directory names
-and file-name globs are compared case-sensitively. These rules are provisional until the
-pre-registration (#32) freezes the exclusion globs.
+file. Matching is by path only, on POSIX-style paths relative to the repo root. The path is
+lowercased and every rule below is written in lowercase, so matching is case-insensitive and the
+same on every OS. These rules are provisional until the pre-registration (#32) freezes the
+exclusion globs.
 """
 
 from collections.abc import Iterable
@@ -20,8 +21,14 @@ _TEST_FILE_GLOBS = ("test_*.py", "*_test.py", "conftest.py")
 
 _DOC_DIRS = frozenset({"doc", "docs"})
 
-_GENERATED_DIRS = frozenset({"generated", "__generated__"})
-_GENERATED_FILE_GLOBS = ("*_pb2.py", "*_pb2_grpc.py", "*_generated.py", "*.generated.py")
+_GENERATED_DIRS = frozenset({"generated", "__generated__", "build", "dist"})
+_GENERATED_FILE_GLOBS = (
+    "*_pb2.py",
+    "*_pb2_grpc.py",
+    "*_generated.py",
+    "*.generated.py",
+    "_version.py",
+)
 
 _VENDORED_DIRS = frozenset(
     {
@@ -31,6 +38,8 @@ _VENDORED_DIRS = frozenset(
         "third_party",
         "third-party",
         "site-packages",
+        "venv",
+        ".venv",
     },
 )
 
@@ -40,7 +49,7 @@ _EXCLUDED_FILE_GLOBS = _TEST_FILE_GLOBS + _GENERATED_FILE_GLOBS
 
 def is_eligible(path: str) -> bool:
     """Return whether `path` is a `*.py` source file outside the excluded categories."""
-    pure = PurePosixPath(path)
+    pure = PurePosixPath(path.lower())
     if pure.suffix != SOURCE_SUFFIX:
         return False
     *directories, name = pure.parts
