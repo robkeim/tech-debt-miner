@@ -1,6 +1,6 @@
 # Target repos and Cutoff dates are chosen to sit after the model's training cutoff
 
-Accepted. Decided in #36 from the research in #35. Supplements the pre-registration in [ADR 0005](0005-scoring-pre-registration.md); the Label is [ADR 0004](0004-label-is-future-fix-proneness.md).
+Accepted. Decided in #36 from the research in #35. Supplements the pre-registration in [ADR 0005](0005-scoring-pre-registration.md); the Label is [ADR 0004](0004-label-is-future-fix-proneness.md). The "at least 25 candidate Fix commits" criterion is replaced by [ADR 0011](0011-repo-eligibility-uses-label-coverage.md).
 
 ## Decisions
 
@@ -38,3 +38,39 @@ Accepted. Decided in #36 from the research in #35. Supplements the pre-registrat
 - **K has month granularity.** The primary Cutoff date sits on the first day after it, and content near the boundary is sparse in training data.
 - **Size range is provisional.** The 100 to 1,500 file bounds depend on the ranker's prompt design (#38) and are re-checked there.
 - **ADR 0005 is already merged.** The label-lag rule is recorded here as a supplement, since no scored Run exists yet.
+
+## Frozen Target repos
+
+Added 2026-11-24 from #60, as ADR 0006's Selection row requires. The choice used only repo metadata and git and issue history up to that date; no LLM or baseline result existed or was consulted.
+
+| Repo | Stars | Pinned SHA (last default-branch commit before 2026-07-01) | Python source files | Squash share | Fix messages with only a PR number | Tracker-confirmed Fix commits | Files with Label of 1 or more |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| yt-dlp/yt-dlp | 210,391 | `e584a65f2a0feee0c6c363b3309e9ebd6065f6b4` | 1,070 | 0.96 | 0.40 | 30 | 25 |
+| celery/celery | 29,258 | `3afde800618741a9e5352d84f3741f3c9b448c2f` | 202 | 0.91 | 0.56 | 49 | 30 |
+| python/mypy | 20,734 | `47f0df577f42c726f847163f9c0a15df681a8479` | 347 | 1.00 | 0.30 | 49 | 51 |
+| statsmodels/statsmodels | 11,764 | `f6e07836022dcbc995bda925c50983e52f060303` | 488 | 0.01 | 0.81 | 73 | 50 |
+| napari/napari | 2,813 | `f97c9aea2555a9462fa403e948fcb07c30a07103` | 480 | 1.00 | 0.31 | 32 | 26 |
+| getsentry/sentry-python | 2,220 | `171aa1646187b79e2a85ce1177a65e509333a8aa` | 191 | 0.93 | 0.41 | 32 | 25 |
+| unionai-oss/pandera | 4,536 | `e649b0d76e3ecb3b6ca916bdd5807c64eddd7603` | 213 | 0.97 | 0.58 | 20 | 49 |
+| pymc-labs/pymc-marketing | 1,314 | `3c5cbd993aa96b735f41ea1a08ea2c35a899b935` | 107 | 0.99 | 0.47 | 24 | 20 |
+
+Window-dependent columns cover 2026-07-01 to 2026-11-24 (79% of the primary window), not the full window. Each Pinned SHA is the primary Cutoff date's; Runs at the exploratory Cutoff dates pin the last commit before that date.
+
+### How the numbers were measured
+
+- **Candidates:** about 85 Python repos with recent pushes in the two star bands, scanned from partial clones. Stars are current counts, not stars at the Pinned SHA; every pick sits well inside its band.
+- **Source files:** `.py` files at the Pinned SHA, excluding test, docs, example, script, vendored, build and migration paths, `conftest.py`, `setup.py` and generated files. This is an approximation until #38 fixes the path filter.
+- **Tracker-confirmed Fix commit:** a non-merge, non-bot commit on the default branch whose message matches the keyword rule, avoids the exclusion words, and references an issue (not the trailing `(#N)` PR number) that is closed and typed or labeled as a bug. No N cap and no rename following, so these counts are approximations of the ADR 0004 Label.
+- **Squash share:** commits whose subject ends in `(#N)`. A low share (`statsmodels`) means commits land without squashing, not that messages are title-only.
+
+### Selection notes
+
+- **Strict reading is rare.** Of the repos scanned, only about 10 reached 25 tracker-confirmed Fix commits so far, because most fixes name only their PR. Repos failing that were dropped, even when well known (`pytest`, `requests`, `flask`, `pydantic`, `scikit-learn`, `sympy`).
+- **Two repos are below 25 today.** `pandera` (20) and `pymc-marketing` (24) are projected at about 25 and 30 over the full window by linear extrapolation. Both already clear ADR 0005's 10-file minimum.
+- **Skipped despite passing:** `kornia` (a 1,117-commit keyword spike looks like bulk or automated activity) and `sktime` (10,101 stars, too near the 10k edge).
+- **Exploratory windows are thin for some repos.** `pymc-marketing` and `mypy` (and others) have uneven earlier windows. Only the primary window feeds the verdict.
+
+### Re-check before the first scored Run
+
+- Recount at 2026-12-31 and replace any repo below 25 tracker-confirmed Fix commits or 10 files with a Label of 1 or more. A replacement is a new amendment, chosen blind.
+- Re-verify the source file range once #38 fixes the path filter.
