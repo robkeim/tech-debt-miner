@@ -69,3 +69,7 @@ flowchart TB
 - **Types that serialize themselves.** It couples every leaf module to the on-disk format.
 - **pydantic.** A dependency for validation the tool does not need, since it only reads files it wrote.
 - **A config file of Target repos.** ADR 0006 already freezes the list, and a batch runner can come later.
+
+## Amendments
+
+- 2026-11-24: [ADR 0014](0014-run-artifacts-are-a-codec-table.md) refines the "One `RunDir` class" rule. `RunDir` still owns every artifact path and does the atomic writes; its interface is now `read`, `write`, `append` and friends over the artifact table in `run/artifacts.py`.
