@@ -69,7 +69,7 @@ With thinking at `medium` a ranking costs about $0.10 more, and at `high` about 
 
 ## Known limits
 
-- **Sonnet 5.5 rejects non-default `temperature`** (per the claude-api skill's Thinking and Effort table; the pilot's first call confirms it), so ADR 0005's "3 repeats at temperature 0" cannot be run as written. The amendment is #62, and until it lands ADR 0005 is knowingly unmet on this point. The repeats still measure the remaining variance, and Replay does not depend on temperature ([ADR 0001](0001-reproducibility-means-replay.md)).
+- **Sonnet 5.5 rejects non-default `temperature`** (per the claude-api skill's Thinking and Effort table; the pilot's first call confirms it), so ADR 0005's "3 repeats at temperature 0" cannot be run as written. [ADR 0012](0012-llm-repeats-use-default-sampling.md) amends ADR 0005 on this point. The repeats still measure the remaining variance, and Replay does not depend on temperature ([ADR 0001](0001-reproducibility-means-replay.md)).
 - **Thinking off may handicap the ranker.** A weaker ranker biases results toward the Baseline: it can turn a Win into a Null, Mixed or Inconclusive result. Results state the arm used.
 - **The digest and truncation parameters are conventions**, not tuned values: 5 subjects, 150 lines, a Triage set of 100. Changing them needs an amendment, since they shape every prompt.
 - **A 150-line head** shows less of a long file than the baseline's whole-file complexity sees, and module-level logic late in a file is outline only.
