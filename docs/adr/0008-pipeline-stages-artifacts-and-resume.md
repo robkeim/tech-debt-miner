@@ -13,7 +13,7 @@ flowchart LR
     S -.-> SN[(snapshot.json)]
     K -.-> RQ[(requests.jsonl<br/>responses.jsonl<br/>rankings/*.json<br/>cost.json)]
     L -.-> LB[(labels.json)]
-    C -.-> SC[(scores.json)]
+    C -.-> SC[(scores-DATE.json)]
     C --> RP[report: many Runs]
 ```
 
@@ -23,7 +23,7 @@ flowchart LR
 | `snapshot` | `snapshot.json` | Eligible files, churn, complexity, and issues as of the Cutoff date (ADR 0004 filters, [ADR 0007](0007-heuristic-baseline-definition.md) inputs). The only stage that reads the Target repo. |
 | `rank` | `requests.jsonl`, `responses.jsonl`, `rankings/baseline.json`, `rankings/llm-<n>.json`, `cost.json` | The only stage that calls the LLM. |
 | `label` | `labels.json` | Fix commits in `(Cutoff date, Cutoff date + 6 months]`. Refuses until the window has closed. |
-| `score` | `scores.json` | Every ADR 0005 metric for this one Run, plus the scoring date. Refuses until `label` is done. |
+| `score` | `scores-<scoring-date>.json` | Every ADR 0005 metric for this one Run. Refuses until `label` is done. A re-score writes a new file and never overwrites an earlier one. |
 
 `report` is a separate command over many Runs. It writes the committed summaries, not files inside a Run.
 
@@ -31,13 +31,15 @@ flowchart LR
 
 Written once, atomically, by `resolve`, and never changed. It holds only inputs: the model snapshot and its training cutoff `K` with `C - K` ([ADR 0006](0006-target-repos-and-cutoff-dates.md)), the prompt template hashes, the Pinned SHA, the Cutoff date, the repeat count, the `lizard` version, the commit SHAs of ADR 0005 and ADR 0007, and the tool's own git SHA.
 
-Actual spend lives in `cost.json`, and the scoring date in `scores.json`, because neither is known when the Manifest is written. The Run directory name is `<UTC-timestamp>-<8 hex of sha256 over the canonical manifest.json>`, and that name is the Run id.
+Actual spend lives in `cost.json`, and the scoring date in the name of each `scores-<scoring-date>.json`, because neither is known when the Manifest is written. The Run directory name is `<UTC-timestamp>-<8 hex of sha256 over the canonical manifest.json>`, and that name is the Run id.
+
+This amends the Label lag row of [ADR 0006](0006-target-repos-and-cutoff-dates.md): the scoring date is recorded in the `scores-<scoring-date>.json` name, not in the Manifest. `report` treats the earliest scoring on or after 2027-01-31 as primary, and any later one as the sensitivity check ADR 0006 describes.
 
 ## Resume
 
 - **A stage is done when its final artifact exists.** Artifacts are written to a temporary file and renamed, so a crash leaves either the whole file or none. Resume skips done stages and does not compare input hashes, because the Manifest is immutable and the directory is tied to it.
 - **`rank` resumes per ranking.** It writes one ranking per (ranker, repeat) and re-sends only the missing ones.
-- **A Run's state is derived from its artifacts:** planned (`manifest.json`, `snapshot.json`, `requests.jsonl`), ranked (plus `rankings/*`), scored (plus `labels.json` and `scores.json`). A `status` command prints it. There is no marker file.
+- **A Run's state is derived from its artifacts:** planned (`manifest.json`, `snapshot.json`, `requests.jsonl`), ranked (plus `rankings/*`), scored (plus `labels.json` and at least one `scores-*.json`). A `status` command prints it. There is no marker file.
 - **A Dry-run is a planned Run.** It runs `resolve` and `snapshot`, writes `requests.jsonl` and a cost estimate, and stops before sending. `resume <id> --run` continues the same directory into real calls, so the estimate is what the real Run sends.
 - **Repeating a Run** means starting a new one, which gets a new directory.
 - **`--max-usd` is not in the Manifest.** It is an invocation parameter that caps the Run's total spend, with `cost.json` accumulating across resumes. Each attempt logs the cap it ran under. Resuming past the cap needs a higher `--max-usd`.
