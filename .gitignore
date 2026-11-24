@@ -227,3 +227,6 @@ __marimo__/
 
 # Gate output
 coverage.xml
+
+# Target repo clones (read-only, ADR 0009)
+repos/

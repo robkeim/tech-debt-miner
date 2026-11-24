@@ -82,7 +82,7 @@ ADR 0005 lets both rankers see issues as of the Cutoff date. Issue state is rebu
 - Abandoned Dry-run directories accumulate in the gitignored `runs/`.
 - An old Run can be replayed only by old code.
 - Excluding issues edited after the Cutoff date removes some legitimate context, and the excluded count shows how much.
-- ADR 0005 specifies "3 LLM repeats at temperature 0", which the API no longer allows. This ADR does not change ADR 0005. It needs an amendment ADR: the repeats are default-sampling draws, the variation they measure is larger, and the "Repeats at temperature 0" rationale no longer holds.
+- ADR 0005 specifies "3 LLM repeats at temperature 0", which the API no longer allows. This ADR does not change ADR 0005. It is amended by [ADR 0012](0012-llm-repeats-use-default-sampling.md): the repeats are default-sampling draws, the variation they measure is larger, and the "Repeats at temperature 0" rationale no longer holds.
 - The unverified part of the issue rebuild is the edit history. REST returns only the current body, and GraphQL `userContentEdits` was not checked against public repos. The snapshot spike must confirm it, or fall back to excluding every issue it cannot prove clean.
 
 ## Alternatives rejected
