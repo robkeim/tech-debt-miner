@@ -6,7 +6,6 @@ gets 0.
 
 import importlib
 from collections.abc import Iterable
-from dataclasses import dataclass
 from typing import Protocol, cast
 
 
@@ -27,18 +26,14 @@ class _AnalyzeFile(Protocol):
 _analyze_file = cast("_AnalyzeFile", importlib.import_module("lizard").analyze_file)
 
 
-@dataclass(frozen=True)
-class Complexity:
-    value: int
-    zero: bool  # True when the 0 stands for "no functions" or "could not analyze"
+def file_complexity(path: str, content: bytes) -> int:
+    """Return the summed cyclomatic complexity of the functions in `content`.
 
-
-def file_complexity(path: str, content: bytes) -> Complexity:
-    """Return the summed cyclomatic complexity of the functions in `content`."""
+    0 means no functions, or a file `lizard` could not analyze.
+    """
     try:
         source = content.decode("utf-8")
         functions = _analyze_file.analyze_source_code(path, source).function_list
     except Exception:  # noqa: BLE001 - lizard's failures on odd input are unspecified; 0 is the rule
-        return Complexity(0, zero=True)
-    total = sum(function.cyclomatic_complexity for function in functions)
-    return Complexity(total, zero=total == 0)
+        return 0
+    return sum(function.cyclomatic_complexity for function in functions)

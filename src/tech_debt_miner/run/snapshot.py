@@ -7,7 +7,8 @@ from pathlib import Path
 from tech_debt_miner.repo import git
 from tech_debt_miner.repo.churn import count_churn, window_start
 from tech_debt_miner.repo.complexity import file_complexity
-from tech_debt_miner.repo.eligibility import eligible_paths, physical_loc
+from tech_debt_miner.repo.eligibility import physical_loc
+from tech_debt_miner.repo.tree import read_eligible_files
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import FileFacts, Snapshot
 
@@ -29,16 +30,17 @@ def snapshot(run_dir: RunDir, deps: SnapshotDeps) -> None:
     manifest = run_dir.read_manifest()
     repo = deps.repos_dir / manifest.target_repo.rsplit("/", 1)[-1]
     cutoff = date.fromisoformat(manifest.cutoff_date)
-    with git.export_tree(repo, manifest.pinned_sha) as tree:
-        files = (f for f in tree.rglob("*") if f.is_file() and not f.is_symlink())
-        by_path = {f.relative_to(tree).as_posix(): f for f in files}
-        paths = eligible_paths(by_path)
-        contents = {path: by_path[path].read_bytes() for path in paths}
+    contents = read_eligible_files(repo, manifest.pinned_sha)
+    paths = list(contents)
     churn = count_churn(git.list_commits(repo, window_start(cutoff), cutoff), paths)
-    facts: list[FileFacts] = []
-    zero = 0
-    for path in paths:
-        complexity = file_complexity(path, contents[path])
-        zero += complexity.zero
-        facts.append(FileFacts(path, physical_loc(contents[path]), churn[path], complexity.value))
-    run_dir.write_snapshot(Snapshot(files=tuple(facts), issues=(), zero_complexity_files=zero))
+    facts = tuple(
+        FileFacts(
+            path,
+            physical_loc(contents[path]),
+            churn[path],
+            file_complexity(path, contents[path]),
+        )
+        for path in paths
+    )
+    zero = sum(1 for fact in facts if fact.complexity == 0)
+    run_dir.write_snapshot(Snapshot(files=facts, issues=(), zero_complexity_files=zero))
