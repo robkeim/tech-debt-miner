@@ -58,3 +58,7 @@ _Avoid_: Revisions, change count
 **Churn window**:
 The 12 months before the Cutoff date over which Churn is counted. Not the scoring window after the Cutoff date.
 _Avoid_: Window (unqualified), lookback
+
+**Triage set**:
+The at most 100 files the LLM ranker's triage stage selects from a digest of every eligible file, and the only files the rank stage sees code for. Not the ranked output, which holds at most 50.
+_Avoid_: Shortlist (ADR 0005 uses that word for the ranked output)
