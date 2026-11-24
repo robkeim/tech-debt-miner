@@ -130,12 +130,20 @@ def test_a_path_recreated_after_deletion_is_a_new_file() -> None:
     assert counts(commits, ["a.py"]) == {"a.py": 0}
 
 
-def test_commit_order_in_the_input_does_not_matter() -> None:
+def test_commits_are_replayed_by_time_whatever_the_input_order() -> None:
     commits = [
         commit("fix two", "b.py", day=2),
         commit("move", FileChange("b.py", "a.py"), day=1),
     ]
     assert counts(commits, ["a.py"]) == {"a.py": 1}
+
+
+def test_commits_with_equal_timestamps_replay_in_git_order() -> None:
+    newest_first = [
+        commit("fix after move", "b.py", day=0),
+        commit("move", FileChange("b.py", "a.py"), day=0),
+    ]
+    assert counts(newest_first, ["a.py"]) == {"a.py": 1}
 
 
 def test_fix_size_cap_drops_large_fixes() -> None:

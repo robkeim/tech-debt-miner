@@ -147,6 +147,14 @@ def test_label_refuses_until_the_window_has_closed(
     assert not run_dir.labels_path.exists()
 
 
+def test_label_never_overwrites_an_existing_labels_file(tmp_path: Path, repos_dir: Path) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir))
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        label(run_dir, deps_for(repos_dir, max_files=2))
+
+
 def test_label_runs_on_the_first_day_after_the_window(tmp_path: Path, repos_dir: Path) -> None:
     run_dir = make_run(tmp_path, repos_dir)
     deps = LabelDeps(repos_dir=repos_dir, clock=lambda: datetime(2024, 7, 2, tzinfo=UTC))

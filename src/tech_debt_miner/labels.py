@@ -104,7 +104,8 @@ def build_labels(
 ) -> Labels:
     """Count Fix commits per Cutoff-date file.
 
-    `commits` are the non-merge commits in the Label window, in any order. `cutoff_files` are the
+    `commits` are the non-merge commits in the Label window, newest first as `list_commits`
+    returns them; commits with equal times keep git order. `cutoff_files` are the
     paths in the tree at the Pinned SHA; only the eligible ones are counted, each with at least
     a zero. A commit counts once per file. A path is followed through renames back to its
     Cutoff-date path, files deleted later keep their count, and files created later are ignored.
@@ -113,9 +114,14 @@ def build_labels(
     eligible = {path for path in cutoff_files if is_eligible(path)}
     counts = dict.fromkeys(sorted(eligible), 0)
     origin = {path: path for path in cutoff_files}
-    fixes = {c.sha for c in commits if is_keyword_fix(c)}
+    fix_commits = [c for c in commits if is_keyword_fix(c)]
+    fixes = {c.sha for c in fix_commits}
     dropped = 0
-    for commit in sorted(commits, key=lambda c: c.committed_at):
+    oldest_first = list(
+        reversed(commits)
+    )  # the sort below is stable, so equal times stay in git order
+    oldest_first.sort(key=lambda c: c.committed_at)
+    for commit in oldest_first:
         touched = _touched(commit, origin)
         if commit.sha not in fixes:
             continue
@@ -124,7 +130,6 @@ def build_labels(
             continue
         for path in touched & eligible:
             counts[path] += 1
-    fix_commits = [c for c in commits if c.sha in fixes]
     stats = {
         "commits_in_window": len(commits),
         "squash_share": _share(sum(map(is_squash_merge, commits)), len(commits)),

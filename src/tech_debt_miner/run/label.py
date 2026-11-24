@@ -31,6 +31,9 @@ def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
     Cutoff date and ends after its last day, so it can never include a commit the as-of
     functions return. Labels are scoring input only and never reach a prompt.
     """
+    if run_dir.labels_path.exists():
+        msg = f"{run_dir.labels_path.name} already exists; N is fixed before any scored Run"
+        raise FileExistsError(msg)
     manifest = run_dir.read_manifest()
     cutoff = date.fromisoformat(manifest.cutoff_date)
     today = deps.clock().date()
