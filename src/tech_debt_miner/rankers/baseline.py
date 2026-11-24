@@ -3,9 +3,8 @@
 from collections import defaultdict
 from fractions import Fraction
 
+from tech_debt_miner.run.artifacts import BASELINE
 from tech_debt_miner.types import Ranking, Snapshot
-
-BASELINE = "baseline"
 
 
 def percentile_ranks(values: list[float]) -> list[Fraction]:
@@ -38,8 +37,8 @@ def tie_groups(snapshot: Snapshot) -> list[tuple[str, ...]]:
     churn = percentile_ranks([float(f.churn) for f in files])
     complexity = percentile_ranks([f.complexity for f in files])
     by_score: dict[Fraction, list[str]] = defaultdict(list)
-    for fact, c, x in zip(files, churn, complexity, strict=True):
-        by_score[c * x].append(fact.path)
+    for fact, churn_pct, complexity_pct in zip(files, churn, complexity, strict=True):
+        by_score[churn_pct * complexity_pct].append(fact.path)
     return [tuple(by_score[score]) for score in sorted(by_score, reverse=True)]
 
 

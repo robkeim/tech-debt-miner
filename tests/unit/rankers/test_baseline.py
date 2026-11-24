@@ -97,3 +97,10 @@ def test_every_file_appears_once_and_groups_are_ordered_by_score(
     flat = [path for group in groups for path in group]
     assert sorted(flat) == sorted(f.path for f in snapshot.files)
     assert all(group for group in groups)
+    churn = percentile_ranks([float(f.churn) for f in snapshot.files])
+    complexity = percentile_ranks([f.complexity for f in snapshot.files])
+    score = {f.path: c * x for f, c, x in zip(snapshot.files, churn, complexity, strict=True)}
+    for group in groups:
+        assert len({score[path] for path in group}) == 1
+    firsts = [score[group[0]] for group in groups]
+    assert firsts == sorted(set(firsts), reverse=True)
