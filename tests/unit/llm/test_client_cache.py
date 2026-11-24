@@ -67,7 +67,9 @@ def test_repeats_are_not_collapsed_by_the_cache(tmp_path: Path) -> None:
 
 def test_every_response_is_logged_whether_hit_or_miss(tmp_path: Path) -> None:
     rows: list[Mapping[str, object]] = []
-    client = LLMClient(Script(), max_usd=1.0, cache=ResponseCache(tmp_path), responses=rows.append)
+    client = LLMClient(
+        Script(), max_usd=1.0, cache=ResponseCache(tmp_path), on_response=rows.append
+    )
     client.complete(request())
     client.complete(request())
     assert [row["cache_hit"] for row in rows] == [False, True]
@@ -89,7 +91,7 @@ def test_the_per_attempt_log_marks_cache_hits(tmp_path: Path) -> None:
 
 def test_logged_response_text_is_redacted() -> None:
     rows: list[Mapping[str, object]] = []
-    client = LLMClient(Script(f"key {KEY}"), max_usd=1.0, responses=rows.append, secrets=(KEY,))
+    client = LLMClient(Script(f"key {KEY}"), max_usd=1.0, on_response=rows.append, secrets=(KEY,))
     client.complete(request())
     assert KEY not in str(rows)
 
@@ -97,7 +99,9 @@ def test_logged_response_text_is_redacted() -> None:
 def test_unparsable_output_is_retried_once_with_the_next_attempt(tmp_path: Path) -> None:
     rows: list[Mapping[str, object]] = []
     transport = Script("garbage", "42")
-    client = LLMClient(transport, max_usd=1.0, cache=ResponseCache(tmp_path), responses=rows.append)
+    client = LLMClient(
+        transport, max_usd=1.0, cache=ResponseCache(tmp_path), on_response=rows.append
+    )
     assert client.complete_parsed(request(), parse_int) == 42
     assert [call.attempt for call in transport.calls] == [0, 1]
     assert [(row["attempt"], row["text"]) for row in rows] == [(0, "garbage"), (1, "42")]
@@ -126,7 +130,7 @@ def test_amend_rewrites_the_retry() -> None:
 
 def test_two_unparsable_replies_fail_loudly_with_both_logged() -> None:
     rows: list[Mapping[str, object]] = []
-    client = LLMClient(Script("a", "b"), max_usd=1.0, responses=rows.append)
+    client = LLMClient(Script("a", "b"), max_usd=1.0, on_response=rows.append)
     with pytest.raises(UnparsableOutputError):
         client.complete_parsed(request(), parse_int)
     assert [row["text"] for row in rows] == ["a", "b"]

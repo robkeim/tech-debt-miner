@@ -39,7 +39,10 @@ def test_replay_scores_from_the_run_directory_alone(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     cache = ResponseCache(tmp_path / "cache")
     client = LLMClient(
-        Sequence("a.py,b.py", "b.py,a.py"), max_usd=1.0, cache=cache, responses=run.append_response
+        Sequence("a.py,b.py", "b.py,a.py"),
+        max_usd=1.0,
+        cache=cache,
+        on_response=run.append_response,
     )
     client.complete(REQUEST)
     client.complete(replace(REQUEST, repeat=1))
@@ -56,7 +59,7 @@ def test_cache_hits_are_copied_into_the_run_log(tmp_path: Path) -> None:
     cache = ResponseCache(tmp_path / "cache")
     LLMClient(Sequence("a.py"), max_usd=1.0, cache=cache).complete(REQUEST)
     run = make_run(tmp_path)
-    client = LLMClient(DryRunTransport(), max_usd=1.0, cache=cache, responses=run.append_response)
+    client = LLMClient(DryRunTransport(), max_usd=1.0, cache=cache, on_response=run.append_response)
     client.complete(REQUEST)
     (row,) = logged_responses(run)
     assert row.cache_hit
@@ -65,7 +68,7 @@ def test_cache_hits_are_copied_into_the_run_log(tmp_path: Path) -> None:
 
 def test_the_highest_attempt_wins(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    client = LLMClient(Sequence("", "a.py"), max_usd=1.0, responses=run.append_response)
+    client = LLMClient(Sequence("", "a.py"), max_usd=1.0, on_response=run.append_response)
     assert client.complete_parsed(REQUEST, parse_paths) == ("a.py",)
     assert [row.attempt for row in logged_responses(run)] == [0, 1]
     assert final_responses(run)["llm", 0].response.text == "a.py"
@@ -77,7 +80,7 @@ def test_a_resume_that_logs_the_same_attempt_twice_collapses(tmp_path: Path) -> 
     cache = ResponseCache(tmp_path / "cache")
     for _ in range(2):
         LLMClient(
-            Sequence("a.py"), max_usd=1.0, cache=cache, responses=run.append_response
+            Sequence("a.py"), max_usd=1.0, cache=cache, on_response=run.append_response
         ).complete(REQUEST)
     assert len(logged_responses(run)) == 2
     assert len(final_responses(run)) == 1
@@ -85,6 +88,6 @@ def test_a_resume_that_logs_the_same_attempt_twice_collapses(tmp_path: Path) -> 
 
 def test_an_unparsable_final_reply_fails_instead_of_scoring_empty(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    LLMClient(Sequence(""), max_usd=1.0, responses=run.append_response).complete(REQUEST)
+    LLMClient(Sequence(""), max_usd=1.0, on_response=run.append_response).complete(REQUEST)
     with pytest.raises(ValueError, match="empty"):
         replay_rankings(run, parse_paths)

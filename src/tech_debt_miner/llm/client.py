@@ -190,7 +190,7 @@ class LLMClient:
         max_usd: float,
         log: Callable[[Mapping[str, object]], None] = lambda _record: None,
         cache: ResponseCache | None = None,
-        responses: Callable[[Mapping[str, object]], None] = lambda _row: None,
+        on_response: Callable[[Mapping[str, object]], None] = lambda _row: None,
         secrets: tuple[str, ...] = (),
         spent_usd: float = 0.0,
         max_attempts: int = MAX_ATTEMPTS,
@@ -206,7 +206,7 @@ class LLMClient:
         self._max_usd = max_usd
         self._log = log
         self._cache = cache
-        self._responses = responses  # a Run's `responses.jsonl`: every reply, hit or miss
+        self._on_response = on_response  # a Run's `responses.jsonl`: every reply, hit or miss
         self._secrets = secrets
         self._max_attempts = max_attempts
         self._sleep = sleep
@@ -329,7 +329,7 @@ class LLMClient:
             cache_hit=cache_hit,
             response=replace(response, text=redact(response.text, self._secrets)),
         )
-        self._responses(store.logged_response_to_json(logged))
+        self._on_response(store.logged_response_to_json(logged))
 
 
 def _cost(price: Price, input_tokens: int, output_tokens: int) -> float:
