@@ -7,6 +7,7 @@ import pytest
 from support.fixture_repo import Commit, build_fixture_repo, git
 from tech_debt_miner import cli
 from tech_debt_miner.repo import git as repo_git
+from tech_debt_miner.run.artifacts import SNAPSHOT
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 from tech_debt_miner.types import FileFacts, Manifest
@@ -21,10 +22,10 @@ def at(year: int, month: int, day: int) -> datetime:
     return datetime(year, month, day, 12, tzinfo=UTC)
 
 
-def new_run(tmp_path: Path, repo: Path) -> RunDir:
+def new_run(tmp_path: Path, repo: Path, pinned_sha: str | None = None) -> RunDir:
     manifest = Manifest(
         target_repo="owner/target",
-        pinned_sha=repo_git.resolve_pinned_sha(repo, CUTOFF),
+        pinned_sha=pinned_sha or repo_git.resolve_pinned_sha(repo, CUTOFF),
         cutoff_date=CUTOFF.isoformat(),
         model="m",
         model_training_cutoff="2023-06-30",
@@ -63,7 +64,7 @@ def run_snapshot(tmp_path: Path, repo: Path) -> RunDir:
 def test_snapshot_holds_eligible_files_with_loc_churn_and_complexity(
     tmp_path: Path, repo: Path
 ) -> None:
-    facts = run_snapshot(tmp_path, repo).read_snapshot().files
+    facts = run_snapshot(tmp_path, repo).read(SNAPSHOT).files
 
     assert facts == (
         FileFacts("a.py", loc=5, churn=2, complexity=2),
@@ -73,7 +74,18 @@ def test_snapshot_holds_eligible_files_with_loc_churn_and_complexity(
 
 
 def test_snapshot_reports_the_files_scored_zero_complexity(tmp_path: Path, repo: Path) -> None:
-    assert run_snapshot(tmp_path, repo).read_snapshot().zero_complexity_files == 2
+    assert run_snapshot(tmp_path, repo).read(SNAPSHOT).zero_complexity_files == 2
+
+
+def test_churn_counts_only_ancestors_of_the_pinned_sha(tmp_path: Path, repo: Path) -> None:
+    pinned = git(repo, "rev-list", "--reverse", "HEAD").split()[2]  # the "b" commit
+    run_dir = new_run(tmp_path, repo, pinned_sha=pinned)
+    snapshot(run_dir, SnapshotDeps(repos_dir=tmp_path / "repos"))
+
+    churn = {f.path: f.churn for f in run_dir.read(SNAPSHOT).files}
+
+    # "a again", the rename and "c again" are dated before the Cutoff but are not ancestors.
+    assert churn == {"a.py": 1, "b.py": 1, "old_only.py": 0}
 
 
 def test_merge_commits_are_not_churn(tmp_path: Path) -> None:
@@ -90,7 +102,7 @@ def test_merge_commits_are_not_churn(tmp_path: Path) -> None:
     git(repo, "checkout", "--quiet", "main")
     git(repo, *commit, "merge", "--quiet", "--no-ff", "--message", "merge", "side", env=env)
 
-    facts = run_snapshot(tmp_path, repo).read_snapshot().files
+    facts = run_snapshot(tmp_path, repo).read(SNAPSHOT).files
 
     assert [(f.path, f.churn) for f in facts] == [("a.py", 2)]
 
@@ -119,7 +131,7 @@ def test_cli_snapshot_writes_the_artifact(tmp_path: Path, repo: Path) -> None:
     ]
 
     assert cli.main(argv) == 0
-    assert run_dir.snapshot_path.exists()
+    assert (run_dir.path / "snapshot.json").exists()
 
 
 def test_cli_snapshot_rejects_an_unknown_run(tmp_path: Path) -> None:

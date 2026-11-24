@@ -179,3 +179,15 @@ def test_head_sha_and_last_commit_touching(repo: Path) -> None:
 def test_last_commit_touching_an_unknown_path_fails(repo: Path) -> None:
     with pytest.raises(GitError, match="no commit touches"):
         repo_git.last_commit_touching(repo, "nope.py")
+
+
+def test_list_commits_from_a_rev_skips_commits_that_are_not_its_ancestors(repo: Path) -> None:
+    first, second = shas(repo)[:2]
+
+    from_first = repo_git.list_commits(repo, date(2023, 1, 1), CUTOFF, rev=first)
+    from_second = repo_git.list_commits(repo, date(2023, 1, 1), CUTOFF, rev=second)
+    from_head = repo_git.list_commits(repo, date(2023, 1, 1), CUTOFF)
+
+    assert [c.sha for c in from_first] == [first]
+    assert [c.sha for c in from_second] == [second, first]
+    assert len(from_head) == 4

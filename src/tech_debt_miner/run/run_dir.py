@@ -1,16 +1,26 @@
-"""The Run directory: the only code that knows artifact names and paths."""
+"""The Run directory: the only code that touches Run files, over the table in `artifacts`."""
 
 import hashlib
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
 from tech_debt_miner.run import store
-from tech_debt_miner.types import Labels, Manifest, Ranking, Request, Scores, Snapshot
+from tech_debt_miner.run.artifacts import (
+    BASELINE,
+    LABELS,
+    MANIFEST,
+    RANKING,
+    REQUESTS,
+    SCORES,
+    SNAPSHOT,
+    Artifact,
+    Policy,
+)
+from tech_debt_miner.types import Manifest
 
-BASELINE = "baseline"
 LLM = "llm"
 
 
@@ -38,7 +48,7 @@ def run_id(manifest: Manifest, now: datetime) -> str:
 
 
 def _manifest_text(manifest: Manifest) -> str:
-    return store.canonical_json(store.to_json(manifest))
+    return store.canonical_json(MANIFEST.encode(manifest))
 
 
 class RunDir:
@@ -55,108 +65,64 @@ class RunDir:
         """Create the directory for `manifest` and write `manifest.json` into it."""
         run_dir = cls(runs_root / run_id(manifest, clock()))
         run_dir.path.mkdir(parents=True)
-        store.write_atomic(run_dir.manifest_path, _manifest_text(manifest))
+        run_dir.write(MANIFEST, manifest)
         return run_dir
 
     @property
     def id(self) -> str:
         return self.path.name
 
-    # Artifact paths
+    # Reads and writes, over the definitions in `artifacts`
 
-    @property
-    def manifest_path(self) -> Path:
-        return self.path / "manifest.json"
+    def exists(self, artifact: Artifact[Any, Any], key: Any = None) -> bool:  # noqa: ANN401 - key type follows the artifact
+        return self._path(artifact, key).exists()
 
-    @property
-    def snapshot_path(self) -> Path:
-        return self.path / "snapshot.json"
+    def read[T, K](self, artifact: Artifact[T, K], key: K | None = None) -> T:
+        self._require(artifact, Policy.REPLACE, Policy.CREATE_ONCE, op="read")
+        return artifact.decode(store.read_json(self._path(artifact, key)))
 
-    @property
-    def requests_path(self) -> Path:
-        return self.path / "requests.jsonl"
-
-    @property
-    def responses_path(self) -> Path:
-        return self.path / "responses.jsonl"
-
-    @property
-    def cost_path(self) -> Path:
-        return self.path / "cost.json"
-
-    @property
-    def labels_path(self) -> Path:
-        return self.path / "labels.json"
-
-    def ranking_path(self, ranker: str, repeat: int) -> Path:
-        name = ranker if ranker == BASELINE else f"{ranker}-{repeat}"
-        return self.path / "rankings" / f"{name}.json"
-
-    def scores_path(self, scoring_date: str) -> Path:
-        return self.path / f"scores-{scoring_date}.json"
-
-    # Reads and writes
-
-    def read_manifest(self) -> Manifest:
-        return store.manifest_from_json(store.read_json(self.manifest_path))
-
-    def write_snapshot(self, snapshot: Snapshot) -> None:
-        store.write_json(self.snapshot_path, store.to_json(snapshot))
-
-    def read_snapshot(self) -> Snapshot:
-        return store.snapshot_from_json(store.read_json(self.snapshot_path))
-
-    def append_request(self, request: Request) -> None:
-        store.append_jsonl(self.requests_path, store.to_json(request))
-
-    def read_requests(self) -> list[Request]:
-        return [store.request_from_json(row) for row in store.read_jsonl(self.requests_path)]
-
-    def append_response(self, record: Mapping[str, Any]) -> None:
-        store.append_jsonl(self.responses_path, record)
-
-    def read_responses(self) -> list[Any]:
-        return store.read_jsonl(self.responses_path)
-
-    def write_ranking(self, ranking: Ranking) -> None:
-        path = self.ranking_path(ranking.ranker, ranking.repeat)
-        store.write_json(path, store.to_json(ranking))
-
-    def read_ranking(self, ranker: str, repeat: int) -> Ranking:
-        return store.ranking_from_json(store.read_json(self.ranking_path(ranker, repeat)))
-
-    def has_ranking(self, ranker: str, repeat: int) -> bool:
-        return self.ranking_path(ranker, repeat).exists()
-
-    def write_cost(self, cost: Mapping[str, float]) -> None:
-        store.write_json(self.cost_path, cost)
-
-    def read_cost(self) -> dict[str, float]:
-        return dict(store.read_json(self.cost_path))
-
-    def write_labels(self, labels: Labels) -> None:
-        store.write_json(self.labels_path, store.to_json(labels))
-
-    def read_labels(self) -> Labels:
-        return store.labels_from_json(store.read_json(self.labels_path))
-
-    def write_scores(self, scoring_date: str, scores: Scores) -> None:
-        """Write a new scores file. A re-score never overwrites an earlier one."""
-        path = self.scores_path(scoring_date)
-        if path.exists():
-            msg = f"{path.name} already exists; scores are never overwritten"
+    def write[T, K](self, artifact: Artifact[T, K], value: T, key: K | None = None) -> None:
+        """Write `value`. A `CREATE_ONCE` artifact (scores) never overwrites an earlier file."""
+        self._require(artifact, Policy.REPLACE, Policy.CREATE_ONCE, op="write")
+        path = self._path(artifact, self._key_for(artifact, value, key))
+        if artifact.policy is Policy.CREATE_ONCE and path.exists():
+            msg = f"{path.name} already exists; it is never overwritten"
             raise FileExistsError(msg)
-        store.write_json(path, store.to_json(scores))
+        store.write_json(path, artifact.encode(value))
 
-    def read_scores(self, scoring_date: str) -> Scores:
-        return store.scores_from_json(store.read_json(self.scores_path(scoring_date)))
+    def append[T](self, artifact: Artifact[T, None], value: T) -> None:
+        self._require(artifact, Policy.APPEND, op="append to")
+        store.append_jsonl(self._path(artifact, None), artifact.encode(value))
 
-    def scoring_dates(self) -> list[str]:
-        prefix, suffix = "scores-", ".json"
-        return sorted(
-            p.name.removeprefix(prefix).removesuffix(suffix)
-            for p in self.path.glob(f"{prefix}*{suffix}")
-        )
+    def read_all[T](self, artifact: Artifact[T, None]) -> list[T]:
+        self._require(artifact, Policy.APPEND, op="read all rows of")
+        return [artifact.decode(row) for row in store.read_jsonl(self._path(artifact, None))]
+
+    def keys[K](self, artifact: Artifact[Any, K]) -> list[K]:
+        """Return the keys of a keyed artifact's existing files, sorted."""
+        if artifact.glob is None or artifact.parse_key is None:
+            msg = f"{artifact.name} cannot be enumerated"
+            raise TypeError(msg)
+        parsed = (artifact.parse_key(p.name) for p in self.path.glob(artifact.glob))
+        return sorted(parsed, key=str)
+
+    def _path(self, artifact: Artifact[Any, Any], key: object) -> Path:
+        if artifact.keyed and key is None:
+            msg = f"{artifact.name} needs a key"
+            raise TypeError(msg)
+        return self.path / artifact.path(key)
+
+    @staticmethod
+    def _key_for[T, K](artifact: Artifact[T, K], value: T, key: K | None) -> K | None:
+        if key is None and artifact.key_of is not None:
+            return artifact.key_of(value)
+        return key
+
+    @staticmethod
+    def _require(artifact: Artifact[Any, Any], *policies: Policy, op: str) -> None:
+        if artifact.policy not in policies:
+            msg = f"cannot {op} {artifact.name}: it is a {artifact.policy} artifact"
+            raise TypeError(msg)
 
     # Stage and state checks
 
@@ -164,28 +130,26 @@ class RunDir:
         """Return whether the stage's final artifact exists."""
         match stage:
             case Stage.RESOLVE:
-                return self.manifest_path.exists()
+                return self.exists(MANIFEST)
             case Stage.SNAPSHOT:
-                return self.snapshot_path.exists()
+                return self.exists(SNAPSHOT)
             case Stage.RANK:
                 return self.is_done(Stage.RESOLVE) and self._all_rankings_exist()
             case Stage.LABEL:
-                return self.labels_path.exists()
+                return self.exists(LABELS)
             case Stage.SCORE:
-                return bool(self.scoring_dates())
+                return bool(self.keys(SCORES))
 
     def _all_rankings_exist(self) -> bool:
-        repeats = self.read_manifest().repeats
-        return self.has_ranking(BASELINE, 0) and all(
-            self.has_ranking(LLM, repeat) for repeat in range(repeats)
+        repeats = self.read(MANIFEST).repeats
+        return self.exists(RANKING, (BASELINE, 0)) and all(
+            self.exists(RANKING, (LLM, repeat)) for repeat in range(repeats)
         )
 
     def state(self) -> RunState | None:
         """Derive the Run's state from its artifacts, or None before it is planned."""
         planned = (
-            self.is_done(Stage.RESOLVE)
-            and self.is_done(Stage.SNAPSHOT)
-            and self.requests_path.exists()
+            self.is_done(Stage.RESOLVE) and self.is_done(Stage.SNAPSHOT) and self.exists(REQUESTS)
         )
         if not planned:
             return None

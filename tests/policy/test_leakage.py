@@ -11,6 +11,7 @@ import pytest
 
 from support.fixture_repo import Commit, build_fixture_repo, head_sha
 from tech_debt_miner.repo import git as repo_git
+from tech_debt_miner.run.artifacts import SNAPSHOT
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 from tech_debt_miner.types import FileFacts, Manifest
@@ -62,11 +63,11 @@ def test_the_snapshot_never_carries_post_cutoff_history(tmp_path: Path, repo: Pa
 
     run_dir = run_snapshot(tmp_path, repo, pinned_sha=pinned, cutoff=CUTOFF)
 
-    assert POISON not in run_dir.snapshot_path.read_text(encoding="utf-8")
-    assert run_dir.read_snapshot().files == (FileFacts("a.py", loc=4, churn=1, complexity=2),)
+    assert POISON not in (run_dir.path / "snapshot.json").read_text(encoding="utf-8")
+    assert run_dir.read(SNAPSHOT).files == (FileFacts("a.py", loc=4, churn=1, complexity=2),)
 
 
 def test_the_test_fails_when_the_cutoff_filter_is_disabled(tmp_path: Path, repo: Path) -> None:
     run_dir = run_snapshot(tmp_path, repo, pinned_sha=head_sha(repo), cutoff=date(2099, 1, 1))
 
-    assert POISON in run_dir.snapshot_path.read_text(encoding="utf-8")
+    assert POISON in (run_dir.path / "snapshot.json").read_text(encoding="utf-8")

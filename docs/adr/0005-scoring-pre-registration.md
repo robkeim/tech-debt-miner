@@ -1,6 +1,6 @@
 # Scoring is pre-registered: nDCG@20 with a recall@20%-LOC check
 
-Accepted. This ADR is the pre-registration for the experiment. The "3 repeats at temperature 0" wording is amended by [ADR 0012](0012-llm-repeats-use-default-sampling.md).
+Accepted. This ADR is the pre-registration for the experiment. The "3 repeats at temperature 0" wording is amended by [ADR 0012](0012-llm-repeats-use-default-sampling.md). The duplicate-file rule is clarified by [ADR 0013](0013-duplicate-files-keep-their-slot.md).
 
 ## How it is frozen
 

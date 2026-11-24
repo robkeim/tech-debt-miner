@@ -71,3 +71,15 @@ class Labels:
 @dataclass(frozen=True)
 class Scores:
     metrics: Mapping[str, float]  # metric name -> value
+
+
+@dataclass(frozen=True)
+class Response:
+    """One LLM reply in provider-neutral form. No SDK object ever leaves `llm/client.py`."""
+
+    text: str
+    input_tokens: int
+    output_tokens: int
+    stop_reason: str
+    request_id: str
+    model: str  # the model snapshot the provider says it served

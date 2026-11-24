@@ -66,3 +66,11 @@ _Avoid_: Shortlist (ADR 0005 uses that word for the ranked output)
 **Eligible file**:
 A `*.py` source file that is not a test, doc, generated or vendored file, decided by path alone, ignoring case ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The ranked set and the Label both use only eligible files.
 _Avoid_: Source file (unqualified), candidate
+
+**Response**:
+One LLM reply in provider-neutral form (text, token counts, stop reason, request ID, resolved model), returned by the client in `src/tech_debt_miner/llm/client.py` ([ADR 0014](docs/adr/0014-provider-neutral-response-and-the-anthropic-dependency.md)). Not the Response cache, which stores many.
+_Avoid_: Completion, message (that is the SDK's type)
+
+**Snapshot**:
+The `snapshot.json` artifact: each Eligible file's lines of code, Churn and complexity as of the Cutoff date, plus the count of files whose complexity is 0 because they have no functions or `lizard` could not analyze them. Churn counts only commits that are ancestors of the Pinned SHA, so it covers exactly the tree the complexity comes from.
+_Avoid_: Facts, features

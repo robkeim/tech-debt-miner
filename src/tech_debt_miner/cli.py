@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
+from tech_debt_miner.run.artifacts import MANIFEST
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
@@ -73,7 +74,7 @@ def _resolve(args: argparse.Namespace) -> int:
 
 def _snapshot(args: argparse.Namespace) -> int:
     run_dir = RunDir(args.runs_dir / args.run_id)
-    if not run_dir.manifest_path.exists():
+    if not run_dir.exists(MANIFEST):
         print(f"no such Run: {args.run_id}", file=sys.stderr)
         return 2
     snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
@@ -82,7 +83,7 @@ def _snapshot(args: argparse.Namespace) -> int:
 
 def _status(args: argparse.Namespace) -> int:
     run_dir = RunDir(args.runs_dir / args.run_id)
-    if not run_dir.manifest_path.exists():
+    if not run_dir.exists(MANIFEST):
         print(f"no such Run: {args.run_id}", file=sys.stderr)
         return 2
     state = run_dir.state()
