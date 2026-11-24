@@ -42,6 +42,8 @@ capsys
 commitizen
 complexipy
 csmr
+dataclass
+dataclasses
 delenv
 derandomize
 docstrings
@@ -67,6 +69,7 @@ nosystem
 ostrand
 paywalled
 popt
+pydantic
 pyproject
 pytest
 pytestmark
@@ -76,6 +79,7 @@ scikit
 scoreable
 shellcheck
 sklearn
+stdlib
 testpaths
 tois
 traveller

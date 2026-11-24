@@ -9,7 +9,7 @@ One execution of an experiment against a target repo, producing rankings and sco
 _Avoid_: Job, execution, trial
 
 **Manifest**:
-The immutable record of everything needed to identify and re-score a Run: model, prompts, target repo SHA, cutoff date and cost.
+The immutable record of everything needed to identify and re-score a Run: model, prompt hashes, target repo SHA and cutoff date. Actual cost is recorded beside it in `cost.json`.
 _Avoid_: Metadata, run config
 
 **Target repo**:
