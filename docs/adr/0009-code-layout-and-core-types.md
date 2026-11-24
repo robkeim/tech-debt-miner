@@ -76,4 +76,4 @@ The "git runner" in `deps` is not a separate collaborator. `repo/git.py` is the 
 
 ## Amendments
 
-- 2026-11-24: [ADR 0014](0014-run-artifacts-are-a-codec-table.md) refines the "One `RunDir` class" rule. `RunDir` still owns every artifact path and does the atomic writes; its interface is now `read`, `write`, `append` and friends over the artifact table in `run/artifacts.py`.
+- 2026-11-24: [ADR 0015](0015-run-artifacts-are-a-codec-table.md) refines the "One `RunDir` class" rule. `RunDir` still owns every artifact path and does the atomic writes; its interface is now `read`, `write`, `append` and friends over the artifact table in `run/artifacts.py`.

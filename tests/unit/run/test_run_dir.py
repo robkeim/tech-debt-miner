@@ -18,7 +18,7 @@ from tech_debt_miner.run.artifacts import (
 from tech_debt_miner.run.artifacts import (
     MANIFEST as MANIFEST_FILE,
 )
-from tech_debt_miner.run.run_dir import RunDir, RunState, Stage, run_id
+from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, RunState, Stage, run_id
 from tech_debt_miner.types import (
     FileFacts,
     Issue,
@@ -175,38 +175,69 @@ def test_scores_are_listed_by_date(tmp_path: Path) -> None:
     assert run.keys(SCORES) == ["2027-01-31", "2027-03-01"]
 
 
-def test_stage_done_means_final_artifact_exists(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    assert run.is_done(Stage.RESOLVE)
-    assert not run.is_done(Stage.SNAPSHOT)
-    run.write(SNAPSHOT, Snapshot(files=(), issues=()))
-    assert run.is_done(Stage.SNAPSHOT)
-    assert not run.is_done(Stage.LABEL)
-    assert not run.is_done(Stage.SCORE)
+REQUEST = Request("llm", 0, 0, "m", "s", "p", 10)
+SNAPSHOT_VALUE = Snapshot(files=(), issues=())
 
 
-def test_rank_is_done_only_when_every_ranking_exists(tmp_path: Path) -> None:
+def test_open_finds_an_existing_run(tmp_path: Path) -> None:
     run = make_run(tmp_path)
+    assert RunDir.open(tmp_path, run.id).path == run.path
+
+
+def test_open_refuses_a_directory_without_a_manifest(tmp_path: Path) -> None:
+    (tmp_path / "stray").mkdir()
+    with pytest.raises(RunNotFoundError, match="no such Run: stray"):
+        RunDir.open(tmp_path, "stray")
+    with pytest.raises(RunNotFoundError, match="no such Run: nope"):
+        RunDir.open(tmp_path, "nope")
+
+
+def test_a_fresh_run_is_resolved_and_needs_a_snapshot(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    assert run.state() is RunState.RESOLVED
+    assert run.next_stage() is Stage.SNAPSHOT
+
+
+def test_a_snapshot_without_requests_is_still_resolved(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    assert run.state() is RunState.RESOLVED
+    assert run.next_stage() is Stage.RANK
+
+
+def test_a_planned_run_resumes_at_rank(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
+    assert run.state() is RunState.PLANNED
+    assert run.next_stage() is Stage.RANK
+
+
+def test_rank_resumes_per_ranking(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
+    assert run.missing_rankings() == [("baseline", 0), ("llm", 0), ("llm", 1)]
     run.write(RANKING, Ranking("baseline", 0, ()))
     run.write(RANKING, Ranking("llm", 0, ()))
-    assert not run.is_done(Stage.RANK)
-    assert run.exists(RANKING, ("llm", 0))
-    assert not run.exists(RANKING, ("llm", 1))
-    run.write(RANKING, Ranking("llm", 1, ()))
-    assert run.is_done(Stage.RANK)
-
-
-def test_state_is_derived_from_artifacts(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    assert run.state() is None
-    run.write(SNAPSHOT, Snapshot(files=(), issues=()))
-    assert run.state() is None
-    run.append(REQUESTS, Request("llm", 0, 0, "m", "s", "p", 10))
+    assert run.missing_rankings() == [("llm", 1)]
     assert run.state() is RunState.PLANNED
+    assert run.next_stage() is Stage.RANK
+    run.write(RANKING, Ranking("llm", 1, ()))
+    assert run.missing_rankings() == []
+
+
+def test_a_ranked_run_resumes_at_label_then_score(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
     for ranking in (Ranking("baseline", 0, ()), Ranking("llm", 0, ()), Ranking("llm", 1, ())):
         run.write(RANKING, ranking)
     assert run.state() is RunState.RANKED
+    assert run.next_stage() is Stage.LABEL
     run.write(LABELS, Labels({}))
     assert run.state() is RunState.RANKED
+    assert run.next_stage() is Stage.SCORE
     run.write(SCORES, Scores({}), "2027-01-31")
     assert run.state() is RunState.SCORED
+    assert run.next_stage() is None
