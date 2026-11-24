@@ -5,7 +5,7 @@ Accepted. Decided in #37. Like [ADR 0005](0005-scoring-pre-registration.md), it 
 The baseline ranks every eligible file by `churn_pct × complexity_pct`. Both inputs are computed from the Target repo as of the Cutoff date, using only the Python files that ADR 0004's path filters keep.
 
 - **Scope.** Python only. Eligible files are `*.py` at the Pinned SHA (the commit at the Cutoff date), after ADR 0004's path filters (no tests, docs, generated or vendored files). Nothing is filtered by Label, and the baseline ranks all eligible files.
-- **Churn.** The number of commits on the default branch that touch the file in the 12 months before the Cutoff date. Merge commits are excluded and renames are followed. This is Tornhill's "number of revisions" (*Your Code as a Crime Scene*).
+- **Churn.** The number of commits on the default branch that touch the file in the 12 months before the Cutoff date. Merge commits are excluded and renames are followed. This is Tornhill's "number of revisions": code-maat's `revisions` analysis and the hotspot ranking in *Your Code as a Crime Scene* both use it. Neither gives a hotspot window.
 - **Churn window.** Fixed at 12 months. This is a stated convention, not a sourced optimum: [the research](../research/churn-window.md) found no empirically optimal window (Graves used 2 years, Hassan 6 months, Nagappan and Ball a release interval, Kamei all history). There is no churn-window sweep, no min-revs filter, no same-day collapsing and no decay. Each would be a tuning knob. This window is not ADR 0005's 6-month scoring window after the Cutoff date.
 - **Complexity.** Cyclomatic complexity from `lizard`, summed over a file's functions and methods. Module-level code is not counted, because neither `lizard` nor `radon` reports it as a unit. A file with no functions, or one `lizard` cannot analyze, gets 0 and stays in the ranked set; the count of such files is reported per Run.
 - **Tool pin.** The exact `lizard` version is pinned in `uv.lock` and recorded in the Manifest. Its counting rules are part of the baseline, so upgrading it needs an amendment ADR.
@@ -18,9 +18,9 @@ The baseline ranks every eligible file by `churn_pct × complexity_pct`. Both in
 - **Cyclomatic.** It is the long-standing measure and deterministic, and ADR 0005 already needs it for its effort-proxy sensitivity check, so one tool serves both. It is the baseline's own feature, which is why ADR 0005 uses LOC, not complexity, as the effort proxy.
 - **`lizard` over `radon`.**
   - `radon` is the more common Python-specific choice, but its last release was 6.0.1 on 2023-03-26. `lizard` released 1.26.1 on 2026-11-16.
-  - Both parse Python 3.14 syntax (`type` aliases, generics, `match`, `except*`). On a one-function test file with a two-pattern `match`, an `except*` and a conditional expression, `radon` reported 3 and `lizard` 5. `radon` appears not to count `match` cases, which is not confirmed in its source. The tools differ, so the choice shifts the baseline's numbers.
+  - Both parse Python 3.14 syntax (`type` aliases, generics, `match`, `except*`), but they count differently. In `radon` 6.0.1's `visitors.py`, a `match` does not count its wildcard `case _` (treated like `else`), and `except*` (`TryStar`) is not counted at all. `lizard` 1.26.1 counts both. On test functions, `radon` gave 1 and `lizard` 2 for a lone `except*` block, and `radon` 2 and `lizard` 3 for a `match` with one case and a wildcard. So the choice shifts the baseline's numbers.
   - `lizard` supports many languages, which fits the limitation below.
-  - It is not a claim that `lizard`'s counts are more accurate; they follow the standard definition and count `match` cases.
+  - It is not a claim that either tool's counts are more correct. Neither is the textbook definition applied to every Python construct; the choice is fixed so the baseline can't change after the fact.
 - **Snapshot.** Complexity is computed on the Pinned SHA tree, so nothing dated after the Cutoff date reaches the baseline. The Leakage test covers it.
 
 ## Known limits
@@ -28,7 +28,6 @@ The baseline ranks every eligible file by `churn_pct × complexity_pct`. Both in
 - **Python only.** The complexity tool and the file filter are per language. Another language needs its own baseline spec. Exploring how much an LLM ranker lowers the work of adapting to a language is open, not decided here.
 - The 12-month window is a judgment call. The churn evidence it rests on is mixed (see above).
 - Summing over functions favors large files, and files with logic only at module level look trivially simple. ADR 0005's recall at 20% of LOC exposes the size bias.
-- The Tornhill citation is to the book's definition of "revisions"; the agent doing the research could not read the book pages, so the page reference is unverified.
 
 ## Alternatives rejected
 

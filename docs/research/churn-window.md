@@ -1,6 +1,6 @@
 # Churn window and commit count as churn
 
-Research notes for the heuristic baseline (churn x complexity hotspots). Gathered 2026-11-19 from primary sources where reachable. Anything not verified in a primary source is flagged inline and collected under "Unverified items".
+Research notes for the heuristic baseline (churn x complexity hotspots). Gathered 2026-11-19 from primary sources where reachable. Anything not verified in a primary source is flagged inline; a later pass checked those items, see "Second-pass checks".
 
 ## Question
 
@@ -28,7 +28,7 @@ Research notes for the heuristic baseline (churn x complexity hotspots). Gathere
 - Code-maat README: `revisions` is an analysis; `--min-revs` defaults to 5 ("Minimum number of revisions to include an entity in the analysis"); `--temporal-period` treats all commits in the same day as one logical commit; the analysis window is controlled outside the tool via `git log --after=<date>` (README wording is "the last date of interest", which is confusing since `--after` sets a start bound). The README states no recommended window. <https://github.com/adamtornhill/code-maat>
 - Tornhill, "Code as a Crime Scene" (ACCU Overload 117, 2013) <https://accu.org/journals/overload/21/117/tornhill_1835>: from a fetched summary of the article, "a temporal window of two or three months is a good heuristic" applies to logical (temporal) coupling when developer activity is high, not to hotspot churn. It also drops modules with too few revisions to avoid skew, and says thresholds and period depend on context and usually need tuning. It cites Nagappan et al. [Nagappan08] for metrics "known to serve as good predictors of defects", but per the summary that citation is organizational-structure work, not change frequency or churn. I verified this only through a page summary, not by reading the full article text.
 - Tornhill, "Find Problem Spots With Forensic Methods" (DZone guide, hosted copy) <https://github.com/Code24World/Code-Quality-and-Software-Agility>: states change frequency is "one of the best predictors of software defects" and reports hotspots as about 4% of one project's code linked to 72% of its defects (an anecdotal single-project figure). No time window specified.
-- Book text (Pragmatic Bookshelf, 2015; 2nd ed. 2024): the O'Reilly preview pages (<https://www.oreilly.com/library/view/your-code-as/9781680500813/f_0026.html>, `f_0033.html`) returned HTTP 403, so I could not read the book's time-period guidance. Search-result snippets say the book discusses a "temporal period" for hotspot ranking and code churn as an alternative to change frequency, but I did not verify that. See "Unverified items".
+- Book text (Pragmatic Bookshelf, 2015; 2nd ed. 2024): the O'Reilly preview pages (<https://www.oreilly.com/library/view/your-code-as/9781680500813/f_0026.html>, `f_0033.html`) returned HTTP 403, so I could not read the book's time-period guidance. Search-result snippets say the book discusses a "temporal period" for hotspot ranking and code churn as an alternative to change frequency, a later pass confirmed this from the preview, see "Second-pass checks".
 
 ### Nagappan and Ball, ICSE 2005, "Use of Relative Code Churn Measures to Predict System Defect Density"
 
@@ -84,7 +84,7 @@ Research notes for the heuristic baseline (churn x complexity hotspots). Gathere
 - Bangash et al., "On the Time-Based Conclusion Stability of Cross-Project Defect Prediction Models" <https://arxiv.org/pdf/1911.06348v3.pdf> (abstract read): defect predictor performance varies depending on which time period is evaluated.
 - Majumder et al., "Revisiting process versus product metrics" <https://arxiv.org/pdf/2008.09569> (text skimmed): uses release-based and JIT validation across 700 GitHub projects (train on releases 1 to R-3, test on the last three). It does not choose a calendar window.
 - Yatish, Jiarpakdee, Thongtanunam, Tantithamthavorn, "Mining Software Defects: Should We Consider Affected Releases?" (ICSE 2019), DOI 10.1109/ICSE.2019.00075 (abstract via search result only): the common heuristic of labeling post-release defects by a fixed window after release (typically six months) mislabels data compared with affected-release data. This concerns the outcome window, not the churn window, but it is the most direct evidence that fixed 6-month windows are a convention with measurable error.
-- I did not find a Tantithamthavorn paper that studies the window length of process metrics or "long-term effects" directly. See "Unverified items".
+- I did not find a Tantithamthavorn paper that studies the window length of process metrics or "long-term effects" directly; a later pass also found none. See "Second-pass checks".
 
 ## Commit count as churn
 
@@ -116,15 +116,26 @@ Caveats to state with the result:
 - Studies are heterogeneous (telephony switching, Windows, Eclipse, Apache); effect sizes will not transfer.
 - Release cadence varies widely, so release-based windows are not comparable across repositories.
 
-## Unverified items
+## Second-pass checks
 
-- Tornhill's book text on hotspot time period and "code churn vs change frequency": O'Reilly preview pages returned 403; only search snippets seen. The "two or three months" value comes from a page summary of the ACCU article and applies to temporal coupling; I did not read the full article text.
-- Whether the Nagappan et al. [Nagappan08] work cited by Tornhill is the organizational-structure paper: stated by the page summary, not checked against the reference list.
-- Moser et al. 2008: release boundaries, the process-metric collection window, metric names, and the claim about the six-month pre/post-release windows. Paper text not reachable.
-- D'Ambros et al. (MSR 2010 and EMSE 2012): the six-month post-release defect window, whether process metrics use release-based or decayed windows, and the exact "number of revisions" definition. Paper text not reachable; only the dataset page and search summaries were seen.
-- McIntosh and Kamei 2018 and Jahanshahi et al. 2019: only abstracts/summary pages read, not full text.
-- Yatish et al. 2019: abstract and a secondary description of the six-month heuristic only.
-- Tantithamthavorn on time windows / "long-term" effects: no paper located that studies process-metric window length. If a specific paper is intended, it needs to be identified by title.
-- Graves: copy read is a Waterloo-hosted PDF that may be the 1998 report version; the 50%/year figure and two-year windows should be rechecked against the IEEE TSE text.
-- Kim et al. (500/250 revisions) was mentioned by Kamei et al.; the original paper was not checked.
-- No page numbers or direct-quote verifications beyond the short fragments quoted above were attempted.
+A second pass checked the items this note first left unverified. It was done in a separate chat and read secondary pages and previews as well as papers, so treat it as a check, not a full re-read. The inline text above predates it where they differ.
+
+Confirmed:
+
+- **Nagappan08 (cited by Tornhill):** the organizational-structure paper (Nagappan, Murphy and Basili, "The influence of organizational structure on software quality", ICSE 2008, pp. 521-530), not a churn paper.
+- **Graves:** the Waterloo PDF header reads IEEE TSE 26(7), July 2000, so it is the published version. The 1998 NISS report (TR80) gives the same numbers: the two-year window, the fitted decay of about 50% per year, and number of changes plus age as the best GLM, with module length adding nothing.
+- **Kim et al.:** Kamei et al. section 6.3 says Kim et al. used 500 or 250 revisions per project. The paper is Kim, Whitehead and Zhang, "Classifying Software Changes: Clean or Buggy?", IEEE TSE 34(2), 2008. Kim's paper itself was not opened.
+- **D'Ambros et al. (EMSE 2012 preprint):** confirms a six-month post-release defect window and that the process metrics are the Moser set. NR is the count of revisions; the decay variants apply to churn of source-code metrics, not to NR. Snapshots are taken every two weeks. MOSER had the best average AUC rank, but the top groups were not significantly separable. The MSR 2010 version was not checked separately.
+- **McIntosh and Kamei:** the lab page confirms performance drops about a year after training, retraining within 3 months and 6+ months of history. TSE 44(5), 412-428, 2018. Full text not read.
+- **Yatish et al.:** ICSE 2019, pp. 654-665. The fixed six-month post-release window heuristic has a large impact on the datasets and on classification models, but minimal impact on defect-count models. Trautsch et al. (EMSE 2021, arXiv 1911.08938) report that six months combined with SZZ yields about one false defective label per correct one, and misses two.
+- **Tornhill:** the ACCU article's "two or three months" applies to logical coupling and gives no hotspot window. The O'Reilly preview shows the book ranks hotspots by revisions in "the specified temporal period" with relative rank, and covers code churn (absolute vs. relative) as an alternative to change frequency. No hotspot window value was found, and the book is paywalled.
+
+Corrected:
+
+- **Moser et al. 2008:** the paper does not state a six-month window. It uses the Zimmermann PROMISE data for Eclipse 2.0, 2.1 and 3.0 (post-release, file-level defects) with 18 change metrics, including REVISIONS, REFACTORINGS, BUGFIXES, AUTHORS, LOC_ADDED/DELETED, CODECHURN, CHANGESET, AGE and WEIGHTED_AGE. AGE is measured in weeks back from the release date. Whether the six months comes from the Zimmermann data is unchecked, and the text came from a summarizer over a SciSpace copy.
+- **Jahanshahi et al.:** PROMISE 2019, pp. 90-99. It contradicts McIntosh and Kamei: predictive power does not significantly decline over time, and all-data models beat short-period models. It still recommends weighted sampling of recent data, mainly for calibration. Read through a summarizer of the arXiv version.
+
+Not found:
+
+- **Tantithamthavorn on process-metric window length:** no such paper. The nearest is Yatish et al., which covers the outcome window rather than the churn window.
+- **Page numbers and direct-quote checks:** not attempted.

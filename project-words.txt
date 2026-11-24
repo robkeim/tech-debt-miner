@@ -1,5 +1,7 @@
 ACCU
 Bangash
+Basili
+CODECHURN
 D'Ambros
 EMSE
 Hassan
@@ -15,6 +17,7 @@ Lutz
 Madeyski
 Majumder
 Moser
+NISS
 Nagappan
 Pedrycz
 REXP
@@ -24,7 +27,10 @@ Succi
 Tantithamthavorn
 Thongtanunam
 Tornhill
+Trautsch
 Yatish
+Zhang
+Zimmermann
 acmr
 actioned
 addopts
