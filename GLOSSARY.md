@@ -46,3 +46,15 @@ _Avoid_: Bug commit, fixing commit
 **Label**:
 The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date.
 _Avoid_: Ground truth (as a noun for one file's value), tag
+
+**Baseline**:
+The churn × complexity ranker the LLM is compared against, defined by [ADR 0007](docs/adr/0007-heuristic-baseline-definition.md).
+_Avoid_: Heuristic (as a noun), control
+
+**Churn**:
+A file's number of commits on the default branch in the Churn window, with merge commits excluded and renames followed.
+_Avoid_: Revisions, change count
+
+**Churn window**:
+The 12 months before the Cutoff date over which Churn is counted. Not the scoring window after the Cutoff date.
+_Avoid_: Window (unqualified), lookback
