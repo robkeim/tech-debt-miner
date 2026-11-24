@@ -1,0 +1,108 @@
+"""The artifact table: every file in a Run directory, defined once.
+
+Each `Artifact` holds its name, codec and write policy. `RunDir` reads, writes and
+appends over these definitions. Decoding stays explicit per type (ADR 0009); the table
+only points at the decoders in `store`.
+"""
+
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
+from enum import StrEnum
+from typing import Any
+
+from tech_debt_miner.run import store
+from tech_debt_miner.types import Labels, Manifest, Ranking, Request, Scores, Snapshot
+
+BASELINE = "baseline"
+
+
+class Policy(StrEnum):
+    REPLACE = "replace"  # `write` overwrites atomically
+    CREATE_ONCE = "create-once"  # `write` fails if the file exists
+    APPEND = "append"  # `append` adds one JSONL row; `read_all` returns every row
+
+
+@dataclass(frozen=True)
+class Artifact[T, K]:
+    """One kind of Run file. `K` is the key type for keyed artifacts and `None` otherwise."""
+
+    name: str
+    path: Callable[[K], str]  # relative to the Run directory
+    encode: Callable[[T], Any]
+    decode: Callable[[Any], T]
+    policy: Policy
+    key_of: Callable[[T], K] | None = None  # derive the key from a value, when it carries one
+    glob: str | None = None  # matches every file of a keyed artifact
+    parse_key: Callable[[str], K] | None = None  # file name -> key, the inverse of `path`
+
+
+def _fixed(name: str) -> Callable[[None], str]:
+    return lambda _key: name
+
+
+def _identity[T](value: T) -> T:
+    return value
+
+
+MANIFEST = Artifact[Manifest, None](
+    "manifest",
+    _fixed("manifest.json"),
+    store.to_json,
+    store.manifest_from_json,
+    Policy.CREATE_ONCE,
+)
+SNAPSHOT = Artifact[Snapshot, None](
+    "snapshot", _fixed("snapshot.json"), store.to_json, store.snapshot_from_json, Policy.REPLACE
+)
+REQUESTS = Artifact[Request, None](
+    "requests", _fixed("requests.jsonl"), store.to_json, store.request_from_json, Policy.APPEND
+)
+RESPONSES = Artifact[Mapping[str, Any], None](
+    "responses", _fixed("responses.jsonl"), _identity, _identity, Policy.APPEND
+)
+COST = Artifact[Mapping[str, float], None](
+    "cost", _fixed("cost.json"), _identity, dict, Policy.REPLACE
+)
+LABELS = Artifact[Labels, None](
+    "labels", _fixed("labels.json"), store.to_json, store.labels_from_json, Policy.REPLACE
+)
+
+
+def _ranking_path(key: tuple[str, int]) -> str:
+    ranker, repeat = key
+    name = ranker if ranker == BASELINE else f"{ranker}-{repeat}"
+    return f"rankings/{name}.json"
+
+
+RANKING = Artifact[Ranking, tuple[str, int]](
+    "ranking",
+    _ranking_path,
+    store.to_json,
+    store.ranking_from_json,
+    Policy.REPLACE,
+    key_of=lambda ranking: (ranking.ranker, ranking.repeat),
+)
+
+_SCORES_PREFIX, _SCORES_SUFFIX = "scores-", ".json"
+
+SCORES = Artifact[Scores, str](
+    "scores",
+    lambda scoring_date: f"{_SCORES_PREFIX}{scoring_date}{_SCORES_SUFFIX}",
+    store.to_json,
+    store.scores_from_json,
+    Policy.CREATE_ONCE,
+    glob=f"{_SCORES_PREFIX}*{_SCORES_SUFFIX}",
+    parse_key=lambda file_name: file_name.removeprefix(_SCORES_PREFIX).removesuffix(_SCORES_SUFFIX),
+)
+
+# Every artifact, for tests that iterate the table.
+ALL: tuple[Artifact[Any, Any], ...] = (
+    MANIFEST,
+    SNAPSHOT,
+    REQUESTS,
+    RESPONSES,
+    COST,
+    LABELS,
+    RANKING,
+    SCORES,
+)
