@@ -180,7 +180,7 @@ def test_stage_done_means_final_artifact_exists(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     assert run.is_done(Stage.RESOLVE)
     assert not run.is_done(Stage.SNAPSHOT)
-    run.write(SNAPSHOT, Snapshot(files=(), issues=()))
+    run.write(SNAPSHOT, Snapshot(files=(), issues=(), zero_complexity_files=0))
     assert run.is_done(Stage.SNAPSHOT)
     assert not run.is_done(Stage.LABEL)
     assert not run.is_done(Stage.SCORE)
@@ -200,7 +200,7 @@ def test_rank_is_done_only_when_every_ranking_exists(tmp_path: Path) -> None:
 def test_state_is_derived_from_artifacts(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     assert run.state() is None
-    run.write(SNAPSHOT, Snapshot(files=(), issues=()))
+    run.write(SNAPSHOT, Snapshot(files=(), issues=(), zero_complexity_files=0))
     assert run.state() is None
     run.append(REQUESTS, Request("llm", 0, 0, "m", "s", "p", 10))
     assert run.state() is RunState.PLANNED

@@ -40,7 +40,7 @@ class Issue:
 class Snapshot:
     files: tuple[FileFacts, ...]
     issues: tuple[Issue, ...]
-    zero_complexity_files: int = 0  # files scored 0: no functions, or lizard could not analyze
+    zero_complexity_files: int  # files scored 0: no functions, or lizard could not analyze
 
 
 @dataclass(frozen=True)
