@@ -1,17 +1,22 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
-from tech_debt_miner.repo.churn import count_churn, window_start
+from tech_debt_miner.repo.churn import commits_by_file, recent_subjects, window_start
 from tech_debt_miner.repo.git import CommitChange, FileChange
+from tech_debt_miner.types import CommitSubject
 
 pytestmark = pytest.mark.unit
 
 WHEN = datetime(2023, 6, 1, tzinfo=UTC)
 
 
+def count_churn(commits: list[CommitChange], paths: list[str]) -> dict[str, int]:
+    return {path: len(found) for path, found in commits_by_file(commits, paths).items()}
+
+
 def commit(*changes: FileChange) -> CommitChange:
-    return CommitChange("sha", WHEN, changes)
+    return CommitChange("sha", WHEN, changes, "subject")
 
 
 @pytest.mark.parametrize(
@@ -55,3 +60,31 @@ def test_follows_a_chain_of_renames() -> None:
         commit(FileChange("a.py")),
     ]
     assert count_churn(commits, ["c.py"]) == {"c.py": 3}
+
+
+def test_groups_commits_per_file_newest_first_through_renames() -> None:
+    newest = commit(FileChange("new.py"))
+    rename = commit(FileChange("new.py", old_path="old.py"))
+    oldest = commit(FileChange("old.py"))
+
+    grouped = commits_by_file([newest, rename, oldest], ["new.py", "other.py"])
+
+    assert grouped == {"new.py": [newest, rename, oldest], "other.py": []}
+
+
+def test_recent_subjects_keep_the_newest_five_tagged_with_the_utc_date() -> None:
+    west = timezone(timedelta(hours=-5))
+    commits = [
+        CommitChange("s", datetime(2023, 6, day, 23, 30, tzinfo=west), (), f"c{day}")
+        for day in range(7, 0, -1)
+    ]
+
+    # 23:30 at UTC-5 is 04:30 UTC on the next day.
+    assert recent_subjects(commits) == tuple(
+        CommitSubject(f"2023-06-{day + 1:02d}", f"c{day}") for day in range(7, 2, -1)
+    )
+
+
+def test_recent_subjects_of_a_quiet_file_are_all_kept() -> None:
+    assert recent_subjects([commit()]) == (CommitSubject("2023-06-01", "subject"),)
+    assert recent_subjects([]) == ()

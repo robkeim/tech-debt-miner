@@ -20,10 +20,12 @@ from tech_debt_miner.run.artifacts import (
 )
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, RunState, Stage, run_id
 from tech_debt_miner.types import (
+    CommitSubject,
     FileFacts,
     Issue,
     Labels,
     Manifest,
+    OutlineEntry,
     Ranking,
     Request,
     Scores,
@@ -97,7 +99,18 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
     "manifest": (MANIFEST, None),
     "snapshot": (
         Snapshot(
-            files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
+            files=(
+                FileFacts(
+                    path="a.py",
+                    loc=10,
+                    churn=3,
+                    complexity=2.5,
+                    outline=(OutlineEntry("class", "A", 1, 0),),
+                    head="class A: ...",
+                    truncated_lines=0,
+                    recent_commits=(CommitSubject("2023-06-01", "s"),),
+                ),
+            ),
             issues=(Issue(number=1, title="t", body="b"),),
             zero_complexity_files=4,
         ),

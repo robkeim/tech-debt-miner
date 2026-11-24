@@ -10,7 +10,7 @@ from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.run.artifacts import SNAPSHOT
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
-from tech_debt_miner.types import FileFacts, Manifest
+from tech_debt_miner.types import CommitSubject, Manifest, OutlineEntry
 
 pytestmark = pytest.mark.integration
 
@@ -66,11 +66,57 @@ def test_snapshot_holds_eligible_files_with_loc_churn_and_complexity(
 ) -> None:
     facts = run_snapshot(tmp_path, repo).read(SNAPSHOT).files
 
-    assert facts == (
-        FileFacts("a.py", loc=5, churn=2, complexity=2),
-        FileFacts("c.py", loc=1, churn=3, complexity=0),  # b.py's commits follow the rename
-        FileFacts("old_only.py", loc=1, churn=0, complexity=0),  # outside the Churn window
+    # c.py's churn follows b.py's commits through the rename; old_only.py is outside the window.
+    assert [(f.path, f.loc, f.churn, f.complexity) for f in facts] == [
+        ("a.py", 5, 2, 2),
+        ("c.py", 1, 3, 0),
+        ("old_only.py", 1, 0, 0),
+    ]
+
+
+def test_snapshot_carries_the_outline_and_head_the_prompts_need(tmp_path: Path, repo: Path) -> None:
+    by_path = {f.path: f for f in run_snapshot(tmp_path, repo).read(SNAPSHOT).files}
+
+    assert by_path["a.py"].outline == (OutlineEntry("function", "f", 1, 0),)
+    assert by_path["a.py"].top_level_names == ("f",)
+    assert by_path["a.py"].head == BRANCHY  # a.py ends in one blank line, the fifth
+    assert by_path["a.py"].truncated_lines == 0
+
+
+def test_snapshot_truncates_the_head_and_counts_the_rest(tmp_path: Path) -> None:
+    source = "".join(f"x{n} = {n}\n" for n in range(200))
+    repo = build_fixture_repo(
+        tmp_path / "repos" / "target", [Commit("big", {"big.py": source}, at(2023, 3, 1))]
     )
+
+    (big,) = run_snapshot(tmp_path, repo).read(SNAPSHOT).files
+
+    assert big.head.splitlines() == source.splitlines()[:150]
+    assert big.truncated_lines == 50
+    assert big.loc == 200
+
+
+def test_snapshot_lists_recent_subjects_newest_first_through_renames(
+    tmp_path: Path, repo: Path
+) -> None:
+    by_path = {f.path: f for f in run_snapshot(tmp_path, repo).read(SNAPSHOT).files}
+
+    assert by_path["c.py"].recent_commits == (
+        CommitSubject("2023-07-01", "c again"),
+        CommitSubject("2023-06-01", "rename"),
+        CommitSubject("2023-04-01", "b"),
+    )
+    assert by_path["old_only.py"].recent_commits == ()
+
+
+def test_snapshot_keeps_only_the_five_newest_subjects(tmp_path: Path) -> None:
+    commits = [Commit(f"change {n}", {"a.py": f"x = {n}\n"}, at(2023, 1 + n, 1)) for n in range(7)]
+    repo = build_fixture_repo(tmp_path / "repos" / "target", commits)
+
+    (facts,) = run_snapshot(tmp_path, repo).read(SNAPSHOT).files
+
+    assert [c.subject for c in facts.recent_commits] == [f"change {n}" for n in range(6, 1, -1)]
+    assert facts.churn == 7
 
 
 def test_snapshot_reports_the_files_scored_zero_complexity(tmp_path: Path, repo: Path) -> None:

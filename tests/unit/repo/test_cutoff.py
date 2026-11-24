@@ -50,7 +50,7 @@ def test_fails_on_empty_history() -> None:
 
 def test_range_is_start_inclusive_end_exclusive() -> None:
     def commit(sha: str, stamp: int) -> CommitChange:
-        return CommitChange(sha, datetime.fromtimestamp(stamp, UTC), ())
+        return CommitChange(sha, datetime.fromtimestamp(stamp, UTC), (), "")
 
     commits = [commit("late", AT), commit("edge", AT - 1), commit("early", AT - 2)]
     kept = commits_in_range(commits, date(2023, 12, 31), CUTOFF)
@@ -63,7 +63,8 @@ def test_parse_graph_log_reads_parents() -> None:
 
 
 def test_parse_commit_log_reads_renames() -> None:
-    out = "\0c1 100\n\nM\tx.py\n\0c2 50\n\nR100\told.py\tnew.py\n"
+    out = "\0c1 100 fix the thing, again\n\nM\tx.py\n\0c2 50 \n\nR100\told.py\tnew.py\n"
     first, second = parse_commit_log(out)
+    assert (first.subject, second.subject) == ("fix the thing, again", "")
     assert first.files[0].path == "x.py"
     assert (second.files[0].path, second.files[0].old_path) == ("new.py", "old.py")

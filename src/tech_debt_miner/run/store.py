@@ -15,10 +15,12 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
 from tech_debt_miner.types import (
+    CommitSubject,
     FileFacts,
     Issue,
     Labels,
     Manifest,
+    OutlineEntry,
     Ranking,
     Request,
     Scores,
@@ -103,9 +105,17 @@ def manifest_from_json(data: Mapping[str, Any]) -> Manifest:
     )
 
 
+def _file_facts_from_json(data: Mapping[str, Any]) -> FileFacts:
+    return FileFacts(
+        **{k: v for k, v in data.items() if k not in {"outline", "recent_commits"}},
+        outline=tuple(OutlineEntry(**entry) for entry in data["outline"]),
+        recent_commits=tuple(CommitSubject(**commit) for commit in data["recent_commits"]),
+    )
+
+
 def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
     return Snapshot(
-        files=tuple(FileFacts(**file) for file in data["files"]),
+        files=tuple(_file_facts_from_json(file) for file in data["files"]),
         issues=tuple(Issue(**issue) for issue in data["issues"]),
         zero_complexity_files=data["zero_complexity_files"],
     )

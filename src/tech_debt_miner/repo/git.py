@@ -85,8 +85,8 @@ def list_commits(repo: Path, since: date, until: date, rev: str = "HEAD") -> lis
     `until` for as-of history.
     """
     out = _git(
-        "log", "--no-merges", "-M", "--name-status", "--format=%x00%H %ct", rev, cwd=repo
-    ).decode()
+        "log", "--no-merges", "-M", "--name-status", "--format=%x00%H %ct %s", rev, cwd=repo
+    ).decode(errors="replace")
     return commits_in_range(parse_commit_log(out), since, until)
 
 

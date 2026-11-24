@@ -22,11 +22,38 @@ class Manifest:
 
 
 @dataclass(frozen=True)
+class OutlineEntry:
+    """A class or function definition. `depth` is 0 at the top level and 1 for a method."""
+
+    kind: str  # "class" or "function"
+    name: str
+    line: int  # 1-based
+    depth: int
+
+
+@dataclass(frozen=True)
+class CommitSubject:
+    """One non-merge commit subject from the Churn window. No author, hash, diff or count."""
+
+    date: str  # committer date in UTC, `YYYY-MM-DD`
+    subject: str
+
+
+@dataclass(frozen=True)
 class FileFacts:
     path: str
     loc: int
     churn: int
     complexity: float
+    outline: tuple[OutlineEntry, ...]  # empty when the file does not parse
+    head: str  # the first `HEAD_LINES` lines, undecodable bytes replaced
+    truncated_lines: int  # lines after the head
+    recent_commits: tuple[CommitSubject, ...]  # newest first, at most `MAX_SUBJECTS`
+
+    @property
+    def top_level_names(self) -> tuple[str, ...]:
+        """The top-level class and function names, in file order."""
+        return tuple(entry.name for entry in self.outline if entry.depth == 0)
 
 
 @dataclass(frozen=True)

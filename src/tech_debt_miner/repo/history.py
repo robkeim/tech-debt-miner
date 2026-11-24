@@ -18,11 +18,12 @@ class FileChange:
 
 @dataclass(frozen=True)
 class CommitChange:
-    """A non-merge commit with its committer time and the paths it touched."""
+    """A non-merge commit with its committer time, the paths it touched and its subject line."""
 
     sha: str
     committed_at: datetime
     files: tuple[FileChange, ...]
+    subject: str
 
 
 @dataclass(frozen=True)
@@ -44,13 +45,13 @@ def parse_graph_log(out: str) -> list[LogEntry]:
 
 
 def parse_commit_log(out: str) -> list[CommitChange]:
-    """Parse `git log --name-status --format=%x00%H %ct` output."""
+    """Parse `git log --name-status --format=%x00%H %ct %s` output."""
     commits: list[CommitChange] = []
     for block in out.split("\0")[1:]:
         header, *lines = block.splitlines()
-        sha, stamp = header.split()
+        sha, stamp, subject = header.split(" ", 2)
         files = tuple(_file_change(line) for line in lines if line)
-        commits.append(CommitChange(sha, datetime.fromtimestamp(int(stamp), UTC), files))
+        commits.append(CommitChange(sha, datetime.fromtimestamp(int(stamp), UTC), files, subject))
     return commits
 
 
