@@ -67,14 +67,14 @@ def _resolve(args: argparse.Namespace) -> int:
         lizard_version=version("lizard"),
         clock=lambda: datetime.now(UTC),
     )
-    print(resolve(inputs, deps).id)  # noqa: T201 - the CLI's job is to print
+    print(resolve(inputs, deps).id)
     return 0
 
 
 def _snapshot(args: argparse.Namespace) -> int:
     run_dir = RunDir(args.runs_dir / args.run_id)
     if not run_dir.manifest_path.exists():
-        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+        print(f"no such Run: {args.run_id}", file=sys.stderr)
         return 2
     snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
     return 0
@@ -83,10 +83,10 @@ def _snapshot(args: argparse.Namespace) -> int:
 def _status(args: argparse.Namespace) -> int:
     run_dir = RunDir(args.runs_dir / args.run_id)
     if not run_dir.manifest_path.exists():
-        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+        print(f"no such Run: {args.run_id}", file=sys.stderr)
         return 2
     state = run_dir.state()
-    print(state.value if state else "resolved")  # noqa: T201 - the CLI's job is to print
+    print(state.value if state else "resolved")
     return 0
 
 
