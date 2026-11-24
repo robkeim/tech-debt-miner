@@ -21,6 +21,16 @@ Research notes for the heuristic baseline (churn x complexity hotspots). Gathere
 - Defensible position: pick one fixed window, state it as a convention with a stated rationale, pre-register it, and report sensitivity. Do not claim it is empirically optimal.
 - Commit count (number of revisions) as a churn measure is well supported as a predictor, but the evidence is mixed on whether it adds value over lines-based churn or in cross-project settings (see below).
 
+## How much of each source was read
+
+Claims from the first two groups are the ones to lean on. The last group is context only; an abstract can leave out or flip what the body says (Jahanshahi et al. is an example).
+
+| Depth | Sources |
+| --- | --- |
+| Full text | Nagappan and Ball 2005; Graves et al. 2000; Hassan 2009; Kamei et al. 2013; Madeyski and Jureczko 2015; code-maat README |
+| Most of the text | D'Ambros et al. EMSE 2012 preprint (first 100k of 127k characters; MSR 2010 version not checked) |
+| Abstract, page or summary only | Moser et al. 2008 (summarizer over a mirror); McIntosh and Kamei 2018 (lab page); Jahanshahi et al. 2019 (summarizer over arXiv); Yatish et al. 2019 (ICSE page and authors' slides); Bangash et al.; Majumder et al. (skimmed); Tornhill's ACCU article (summary) and book (O'Reilly preview snippets) |
+
 ## Findings per source
 
 ### Tornhill: Your Code as a Crime Scene and code-maat
