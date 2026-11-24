@@ -61,6 +61,58 @@ def test_pinned_sha_fails_with_no_earlier_history(repo: Path) -> None:
         repo_git.resolve_pinned_sha(repo, date(2020, 1, 1))
 
 
+def test_pinned_sha_steps_back_over_clock_skew(tmp_path: Path) -> None:
+    skewed = build_fixture_repo(
+        tmp_path / "skewed",
+        [
+            Commit("base", {"a.py": "x = 1\n"}, at(2023, 6, 1)),
+            Commit("skewed", {"a.py": f"x = '{POISON}'\n"}, at(2024, 2, 1)),
+            Commit("looks early", {"b.py": "y = 1\n"}, at(2023, 12, 1)),
+        ],
+    )
+    pinned = repo_git.resolve_pinned_sha(skewed, CUTOFF)
+    assert pinned == git(skewed, "rev-parse", "HEAD~2").strip()
+
+
+def test_pinned_tree_excludes_late_dated_merged_side_branch(tmp_path: Path) -> None:
+    merged = build_fixture_repo(
+        tmp_path / "merged", [Commit("base", {"a.py": "x = 1\n"}, at(2023, 6, 1))]
+    )
+    late = {
+        "GIT_AUTHOR_DATE": at(2024, 2, 1).isoformat(),
+        "GIT_COMMITTER_DATE": at(2024, 2, 1).isoformat(),
+    }
+    merge_day = {
+        "GIT_AUTHOR_DATE": at(2023, 12, 15).isoformat(),
+        "GIT_COMMITTER_DATE": at(2023, 12, 15).isoformat(),
+    }
+    git(merged, "switch", "--quiet", "--create", "feature")
+    (merged / "leak.py").write_text(f"y = '{POISON}'\n", encoding="utf-8")
+    git(merged, "add", "leak.py")
+    git(merged, "commit", "--quiet", "--message", "late side work", env=late)
+    git(merged, "switch", "--quiet", "main")
+    (merged / "a.py").write_text("x = 2\n", encoding="utf-8")
+    git(merged, "commit", "--quiet", "--all", "--message", "main work", env=merge_day)
+    before_merge = head_sha(merged)
+    git(merged, "merge", "--quiet", "--no-ff", "--no-edit", "feature", env=merge_day)
+    pinned = repo_git.resolve_pinned_sha(merged, CUTOFF)
+    assert pinned == before_merge != head_sha(merged)
+    with repo_git.export_tree(merged, pinned) as tree:
+        assert not (tree / "leak.py").exists()
+
+
+def test_pinned_sha_fails_when_every_candidate_has_late_ancestry(tmp_path: Path) -> None:
+    skewed = build_fixture_repo(
+        tmp_path / "skewed",
+        [
+            Commit("skewed root", {"a.py": "x = 1\n"}, at(2024, 2, 1)),
+            Commit("looks early", {"a.py": "x = 2\n"}, at(2023, 12, 1)),
+        ],
+    )
+    with pytest.raises(GitError, match="only earlier history"):
+        repo_git.resolve_pinned_sha(skewed, CUTOFF)
+
+
 def test_git_failure_raises(tmp_path: Path) -> None:
     with pytest.raises(GitError, match="failed"):
         repo_git.resolve_pinned_sha(tmp_path, CUTOFF)

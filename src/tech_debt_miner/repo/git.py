@@ -71,18 +71,27 @@ def clone_repo(url: str, dest: Path) -> Path:
 
 
 def resolve_pinned_sha(repo: Path, cutoff: date) -> str:
-    """Return the newest commit on the default branch committed before the Cutoff date.
+    """Return the newest first-parent commit before the Cutoff date whose history is all earlier.
 
-    Follows first parents, so the result is the state the branch was in at that moment.
+    A candidate is committed before the Cutoff date and has no ancestor committed on or after it
+    (for example a late-dated side-branch commit that was merged in, or clock skew). If a
+    candidate fails that check, step back along the first-parent line to the next earlier
+    candidate and check again. This walks the full ancestry of each candidate tried.
     """
     limit = _midnight_utc(cutoff).timestamp()
     out = _git("log", "--first-parent", "--format=%H %ct", "HEAD", cwd=repo).decode()
     for line in out.splitlines():
         sha, stamp = line.split()
-        if int(stamp) < limit:
+        if int(stamp) < limit and _newest_commit_time(repo, sha) < limit:
             return sha
-    msg = f"no commit before {cutoff.isoformat()}"
+    msg = f"no commit before {cutoff.isoformat()} with only earlier history"
     raise GitError(msg)
+
+
+def _newest_commit_time(repo: Path, sha: str) -> int:
+    """Return the latest committer time among `sha` and all its ancestors."""
+    out = _git("log", "--format=%ct", sha, cwd=repo).decode()
+    return max(int(stamp) for stamp in out.split())
 
 
 def list_commits(repo: Path, since: date, until: date) -> list[CommitChange]:
