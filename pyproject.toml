@@ -5,7 +5,10 @@ description = "Backtest whether an LLM can rank files by technical-debt risk bet
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.14"
-dependencies = ["lizard"]
+dependencies = [
+    "anthropic>=2.14.0",
+    "lizard",
+]
 
 [project.scripts]
 gate = "gate.cli:main"
