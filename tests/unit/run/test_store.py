@@ -55,7 +55,7 @@ def test_snapshot_round_trip() -> None:
 def test_request_ranking_labels_scores_round_trip() -> None:
     request = Request("llm", 1, 0, "m", "sys", "prompt", 100)
     ranking = Ranking("llm", 2, ("a.py", "b.py"))
-    labels = Labels({"a.py": 3})
+    labels = Labels({"a.py": 3}, {"squash_share": 0.5})
     scores = Scores({"ndcg": 0.5})
     assert store.request_from_json(store.to_json(request)) == request
     assert store.ranking_from_json(store.to_json(ranking)) == ranking

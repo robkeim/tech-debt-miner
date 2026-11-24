@@ -1,7 +1,7 @@
 """Core types: frozen, plain data. This module imports nothing else from the package."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -64,7 +64,10 @@ class Ranking:
 
 @dataclass(frozen=True)
 class Labels:
-    counts: Mapping[str, int]  # path -> number of Fix commits after the Cutoff date
+    counts: Mapping[str, int]  # Cutoff-date path -> number of Fix commits after the Cutoff date
+    stats: Mapping[str, float] = field(
+        default_factory=dict[str, float]
+    )  # ADR 0004 reporting figures
 
 
 @dataclass(frozen=True)

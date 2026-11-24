@@ -1,4 +1,4 @@
-"""The command line: `resolve` and `status` so far (ADR 0009)."""
+"""The command line: `resolve`, `label` and `status` so far (ADR 0009)."""
 
 import argparse
 import sys
@@ -7,6 +7,7 @@ from datetime import UTC, date, datetime
 from importlib.metadata import version
 from pathlib import Path
 
+from tech_debt_miner.run.label import LabelDeps, WindowOpenError, label
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir
 
@@ -31,6 +32,14 @@ def _parser() -> argparse.ArgumentParser:
     resolve_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     resolve_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    label_cmd = commands.add_parser("label", help="count Fix commits once the window has closed")
+    label_cmd.add_argument("run_id")
+    label_cmd.add_argument(
+        "--max-files", type=int, default=None, help="fix-size cap N; omit for uncapped"
+    )
+    label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
     status_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
@@ -41,6 +50,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "resolve":
         return _resolve(args)
+    if args.command == "label":
+        return _label(args)
     return _status(args)
 
 
@@ -60,6 +71,22 @@ def _resolve(args: argparse.Namespace) -> int:
         clock=lambda: datetime.now(UTC),
     )
     print(resolve(inputs, deps).id)  # noqa: T201 - the CLI's job is to print
+    return 0
+
+
+def _label(args: argparse.Namespace) -> int:
+    run_dir = RunDir(args.runs_dir / args.run_id)
+    if not run_dir.manifest_path.exists():
+        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+        return 2
+    deps = LabelDeps(
+        repos_dir=args.repos_dir, clock=lambda: datetime.now(UTC), max_files=args.max_files
+    )
+    try:
+        label(run_dir, deps)
+    except WindowOpenError as error:
+        print(error, file=sys.stderr)  # noqa: T201 - the CLI's job is to print
+        return 1
     return 0
 
 
