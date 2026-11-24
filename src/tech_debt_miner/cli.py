@@ -11,7 +11,7 @@ from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
-DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K = Jun 2026 (ADR 0006), the month's last day
+DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K, June 30 2026 (ADR 0006)
 DEFAULT_REPEATS = 3  # ADR 0005
 TOOL_ROOT = Path(__file__).resolve().parents[2]
 
@@ -66,10 +66,10 @@ def _resolve(args: argparse.Namespace) -> int:
 def _status(args: argparse.Namespace) -> int:
     run_dir = RunDir(args.runs_dir / args.run_id)
     if not run_dir.manifest_path.exists():
-        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201
+        print(f"no such Run: {args.run_id}", file=sys.stderr)  # noqa: T201 - the CLI's job is to print
         return 2
     state = run_dir.state()
-    print(state.value if state else "resolved")  # noqa: T201
+    print(state.value if state else "resolved")  # noqa: T201 - the CLI's job is to print
     return 0
 
 
