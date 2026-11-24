@@ -25,6 +25,7 @@ def test_fast_runs_the_python_checks_and_skips_the_rest(tmp_path: Path) -> None:
         "ruff format",
         "ruff check",
         "pyright",
+        "adr numbers",
         "cspell",
         "actionlint",
         "zizmor",

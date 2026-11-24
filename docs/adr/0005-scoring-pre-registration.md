@@ -1,6 +1,6 @@
 # Scoring is pre-registered: nDCG@20 with a recall@20%-LOC check
 
-Accepted. This ADR is the pre-registration for the experiment. The "3 repeats at temperature 0" wording is amended by [ADR 0012](0012-llm-repeats-use-default-sampling.md). The duplicate-file rule is clarified by [ADR 0013](0013-duplicate-files-keep-their-slot.md).
+Accepted. This ADR is the pre-registration for the experiment.
 
 ## How it is frozen
 
@@ -90,3 +90,8 @@ Report-only; none can change the verdict. If one flips the direction, the report
 - Ostrand, T., Weyuker, E. and Bell, R. (2005). Predicting the location and number of faults in large software systems. IEEE TSE. https://www.cs.virginia.edu/woda/papers/ostrand.pdf
 - Critical considerations on effort-aware software defect prediction metrics (2025). https://arxiv.org/html/2504.19181v1
 - Research findings are in issues #31 (ranking metrics), #33 (bug-fix labeling) and #35 (memorization).
+
+## Amendments
+
+- 2026-11-24: The "3 repeats at temperature 0" wording is amended by [ADR 0012](0012-llm-repeats-use-default-sampling.md).
+- 2026-11-24: The duplicate-file rule is clarified by [ADR 0013](0013-duplicate-files-keep-their-slot.md).
