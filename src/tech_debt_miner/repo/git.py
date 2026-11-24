@@ -75,14 +75,17 @@ def resolve_pinned_sha(repo: Path, cutoff: date) -> str:
     return pick_pinned_sha(parse_graph_log(out), cutoff)
 
 
-def list_commits(repo: Path, since: date, until: date) -> list[CommitChange]:
-    """Non-merge commits on the default branch committed in `[since, until)`, newest first.
+def list_commits(repo: Path, since: date, until: date, rev: str = "HEAD") -> list[CommitChange]:
+    """Non-merge commits reachable from `rev` committed in `[since, until)`, newest first.
+
+    `rev` defaults to `HEAD`, the default branch. Pass the Pinned SHA to count only the ancestors
+    of the tree being analyzed.
 
     Renames are detected, so a renamed file carries its `old_path`. Pass the Cutoff date as
     `until` for as-of history.
     """
     out = _git(
-        "log", "--no-merges", "-M", "--name-status", "--format=%x00%H %ct", "HEAD", cwd=repo
+        "log", "--no-merges", "-M", "--name-status", "--format=%x00%H %ct", rev, cwd=repo
     ).decode()
     return commits_in_range(parse_commit_log(out), since, until)
 
