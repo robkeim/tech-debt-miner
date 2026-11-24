@@ -1,6 +1,6 @@
 import pytest
 
-from tech_debt_miner.repo.eligibility import eligible_paths, is_eligible, loc_by_path, physical_loc
+from tech_debt_miner.repo.eligibility import eligible_paths, is_eligible, physical_loc
 
 pytestmark = pytest.mark.unit
 
@@ -63,7 +63,6 @@ def test_source_files_are_eligible(path: str) -> None:
         "third_party/lib.py",
         "third-party/lib.py",
         "venv/lib/site-packages/lib.py",
-        "node_modules/pkg/tool.py",
     ],
 )
 def test_other_files_are_excluded(path: str) -> None:
@@ -98,13 +97,3 @@ def test_eligible_paths_filters_sorts_and_deduplicates() -> None:
 )
 def test_physical_loc_counts_every_line(content: bytes, expected: int) -> None:
     assert physical_loc(content) == expected
-
-
-def test_loc_by_path_covers_only_eligible_paths() -> None:
-    contents = {
-        "pkg/mod.py": b"a\nb\nc\n",
-        "tests/test_mod.py": b"assert True\n",
-        "README.md": b"hello\n",
-        "pkg/empty.py": b"",
-    }
-    assert loc_by_path(contents) == {"pkg/empty.py": 0, "pkg/mod.py": 3}

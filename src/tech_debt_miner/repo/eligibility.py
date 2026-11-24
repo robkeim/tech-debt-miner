@@ -5,24 +5,25 @@ pure: it takes paths and file contents and never touches a repo.
 
 A path is eligible when it is a `*.py` source file that is not a test, doc, generated or vendored
 file. Matching is by path only, on POSIX-style paths relative to the repo root. Directory names
-and file-name globs are compared case-sensitively.
+and file-name globs are compared case-sensitively. These rules are provisional until the
+pre-registration (#32) freezes the exclusion globs.
 """
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from fnmatch import fnmatchcase
 from pathlib import PurePosixPath
 
 SOURCE_SUFFIX = ".py"
 
-TEST_DIRS = frozenset({"test", "tests", "testing"})
-TEST_FILE_GLOBS = ("test_*.py", "*_test.py", "conftest.py")
+_TEST_DIRS = frozenset({"test", "tests", "testing"})
+_TEST_FILE_GLOBS = ("test_*.py", "*_test.py", "conftest.py")
 
-DOC_DIRS = frozenset({"doc", "docs"})
+_DOC_DIRS = frozenset({"doc", "docs"})
 
-GENERATED_DIRS = frozenset({"generated", "__generated__"})
-GENERATED_FILE_GLOBS = ("*_pb2.py", "*_pb2_grpc.py", "*_generated.py", "*.generated.py")
+_GENERATED_DIRS = frozenset({"generated", "__generated__"})
+_GENERATED_FILE_GLOBS = ("*_pb2.py", "*_pb2_grpc.py", "*_generated.py", "*.generated.py")
 
-VENDORED_DIRS = frozenset(
+_VENDORED_DIRS = frozenset(
     {
         "vendor",
         "vendored",
@@ -30,12 +31,11 @@ VENDORED_DIRS = frozenset(
         "third_party",
         "third-party",
         "site-packages",
-        "node_modules",
     },
 )
 
-_EXCLUDED_DIRS = TEST_DIRS | DOC_DIRS | GENERATED_DIRS | VENDORED_DIRS
-_EXCLUDED_FILE_GLOBS = TEST_FILE_GLOBS + GENERATED_FILE_GLOBS
+_EXCLUDED_DIRS = _TEST_DIRS | _DOC_DIRS | _GENERATED_DIRS | _VENDORED_DIRS
+_EXCLUDED_FILE_GLOBS = _TEST_FILE_GLOBS + _GENERATED_FILE_GLOBS
 
 
 def is_eligible(path: str) -> bool:
@@ -61,8 +61,3 @@ def physical_loc(content: bytes) -> int:
     Lines end at LF, CRLF or CR.
     """
     return len(content.splitlines())
-
-
-def loc_by_path(contents: Mapping[str, bytes]) -> dict[str, int]:
-    """Return the physical LOC of each eligible path in `contents`."""
-    return {path: physical_loc(contents[path]) for path in eligible_paths(contents)}
