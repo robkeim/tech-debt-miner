@@ -117,6 +117,11 @@ def test_cap_must_be_positive() -> None:
         LLMClient(FakeTransport(response()), max_usd=0)
 
 
+def test_at_least_one_attempt_is_required() -> None:
+    with pytest.raises(ValueError, match="at least 1"):
+        LLMClient(FakeTransport(response()), max_usd=1.0, max_attempts=0)
+
+
 def test_unknown_model_is_refused_before_sending() -> None:
     transport = FakeTransport(response())
     with pytest.raises(UnknownModelError):
@@ -238,7 +243,7 @@ def test_transient_errors_are_retried_with_backoff_and_every_try_is_logged() -> 
     client = LLMClient(script, max_usd=1.0, log=log.append, sleep=sleeps.append)
     assert client.complete(request()) == response()
     assert sleeps == [1.0, 2.0]
-    assert [record["try"] for record in log] == [1, 2, 3]
+    assert [record["try_number"] for record in log] == [1, 2, 3]
     assert [record["cost_usd"] for record in log[:2]] == [WORST_CASE, WORST_CASE]
     assert client.spent_usd == pytest.approx(2 * WORST_CASE + 0.007)
 
@@ -262,7 +267,7 @@ def test_client_gives_up_after_max_attempts_and_charges_each_reserved_cost() -> 
 
 
 def test_permanent_errors_are_not_retried() -> None:
-    script = Script(ProviderError("billed but permanent"))
+    script = Script(ProviderError("permanent"))
     client = LLMClient(script, max_usd=1.0, sleep=lambda _seconds: None)
     with pytest.raises(ProviderError):
         client.complete(request())
@@ -280,8 +285,9 @@ def test_an_error_that_proves_nothing_was_billed_costs_nothing() -> None:
 def test_a_retry_that_would_cross_the_cap_is_refused() -> None:
     script = Script(ProviderError("down", transient=True), response())
     client = LLMClient(script, max_usd=1.5 * WORST_CASE, sleep=lambda _seconds: None)
-    with pytest.raises(CapExceededError):
+    with pytest.raises(CapExceededError) as caught:
         client.complete(request())
+    assert isinstance(caught.value.__cause__, ProviderError)
     assert script.sent == 1
     assert client.spent_usd <= 1.5 * WORST_CASE
 
@@ -297,7 +303,14 @@ def test_dry_run_failure_is_logged_but_costs_nothing_and_is_not_retried() -> Non
 
 @pytest.mark.parametrize(
     ("status", "transient", "billed"),
-    [(429, True, True), (500, True, True), (529, True, True), (400, False, False)],
+    [
+        (408, True, True),
+        (409, True, True),
+        (429, True, True),
+        (500, True, True),
+        (529, True, True),
+        (400, False, False),
+    ],
 )
 def test_http_statuses_map_to_retry_and_billing_flags(
     status: int, *, transient: bool, billed: bool

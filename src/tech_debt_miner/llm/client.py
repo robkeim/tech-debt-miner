@@ -191,6 +191,9 @@ class LLMClient:
         if max_usd <= 0:
             msg = "max_usd must be positive"
             raise ValueError(msg)
+        if max_attempts < 1:
+            msg = "max_attempts must be at least 1"
+            raise ValueError(msg)
         self._transport = transport
         self._max_usd = max_usd
         self._log = log
@@ -209,6 +212,7 @@ class LLMClient:
             (len(request.system) + len(request.prompt)) // CHARS_PER_TOKEN + 1,
             request.max_tokens,
         )
+        last_error: ProviderError | None = None
         for attempt in range(1, self._max_attempts + 1):
             # Reserve the worst case before every attempt, retries included, so a billed
             # failure can never push spend past the cap.
@@ -217,7 +221,7 @@ class LLMClient:
                     f"spent ${self.spent_usd:.2f} plus worst case ${worst_case:.2f} "
                     f"exceeds the ${self._max_usd:.2f} cap; raise it with --max-usd"
                 )
-                raise CapExceededError(msg)
+                raise CapExceededError(msg) from last_error
             try:
                 response = self._transport.send(request, schema)
             except ProviderError as error:
@@ -226,6 +230,7 @@ class LLMClient:
                 self._record(request, attempt, cost=cost, error=redact(str(error), self._secrets))
                 if not error.transient or attempt == self._max_attempts:
                     raise
+                last_error = error
                 self._sleep(min(BACKOFF_BASE_SECONDS * 2 ** (attempt - 1), BACKOFF_MAX_SECONDS))
                 continue
             except LLMError as error:
@@ -235,8 +240,7 @@ class LLMClient:
             self.spent_usd += cost
             self._record(request, attempt, response=response, cost=cost)
             return response
-        msg = "max_attempts must be at least 1"
-        raise ValueError(msg)
+        raise AssertionError  # pragma: no cover - the loop always returns or raises
 
     def _record(
         self,
@@ -251,7 +255,7 @@ class LLMClient:
             "ranker": request.ranker,
             "repeat": request.repeat,
             "attempt": request.attempt,
-            "try": attempt,
+            "try_number": attempt,
             "model": request.model,
             "cost_usd": cost,
             "spent_usd": self.spent_usd,
