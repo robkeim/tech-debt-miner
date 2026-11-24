@@ -165,3 +165,16 @@ def test_cli_probe_reports_an_open_window_and_fails(
     assert cli.main(argv) == 1
 
     assert "window closes" in capsys.readouterr().err
+
+
+def test_cli_probe_reports_a_second_probe_as_an_error(
+    run_dir: RunDir, capsys: pytest.CaptureFixture[str], frozen_clock: time_machine.Traveller
+) -> None:
+    frozen_clock.move_to(datetime(2024, 8, 1, tzinfo=UTC))
+    run_probe(run_dir, deps_for(run_dir, FakeTransport("{}")))
+    argv = ["probe", run_dir.id, "--runs-dir", str(run_dir.path.parent)]
+    argv += ["--repos-dir", str(run_dir.path.parents[1] / "repos")]
+
+    assert cli.main(argv) == 1
+
+    assert "already exists" in capsys.readouterr().err

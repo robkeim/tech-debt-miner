@@ -162,7 +162,7 @@ def _probe(args: argparse.Namespace) -> int:
     except DryRunError:
         print("Dry-run: no call was made; pass --run to send it")
         return 0
-    except (WindowOpenError, NoProbeCommitError, LLMError) as error:
+    except (WindowOpenError, NoProbeCommitError, FileExistsError, LLMError) as error:
         print(error, file=sys.stderr)
         return 1
     print("hit" if result.hit else "miss")
