@@ -10,6 +10,7 @@ from tech_debt_miner.repo.churn import commits_by_file, recent_subjects, window_
 from tech_debt_miner.repo.complexity import file_complexity
 from tech_debt_miner.repo.eligibility import physical_loc
 from tech_debt_miner.repo.git import CommitChange
+from tech_debt_miner.repo.issues import IssueSource, build_issues
 from tech_debt_miner.repo.source import file_head, file_outline
 from tech_debt_miner.repo.tree import read_eligible_files
 from tech_debt_miner.run.artifacts import MANIFEST, SNAPSHOT
@@ -22,6 +23,7 @@ class SnapshotDeps:
     """Injected collaborators."""
 
     repos_dir: Path  # a Target repo is read from `<repos_dir>/<name>`
+    issues: IssueSource | None  # None skips issues (`--no-issues`, offline use)
 
 
 def snapshot(run_dir: RunDir, deps: SnapshotDeps) -> None:
@@ -30,8 +32,9 @@ def snapshot(run_dir: RunDir, deps: SnapshotDeps) -> None:
     Files and complexity come from a `git archive` of the Pinned SHA, exported to a temporary
     directory that is deleted afterward. Churn and commit subjects come from non-merge commits
     in the Churn window before the Cutoff date. Each file also carries the head, outline and
-    subjects the LLM prompts show (ADR 0010), so `rank` needs nothing else. Issues are not
-    collected yet.
+    subjects the LLM prompts show (ADR 0010), so `rank` needs nothing else. Issues come from the
+    injected source, rebuilt as of the Cutoff date; those whose edit history cannot be proven
+    clean are excluded and counted.
     """
     manifest = run_dir.read(MANIFEST)
     repo = deps.repos_dir / manifest.target_repo.rsplit("/", 1)[-1]
@@ -43,7 +46,19 @@ def snapshot(run_dir: RunDir, deps: SnapshotDeps) -> None:
     )
     facts = tuple(_facts(path, contents[path], history[path]) for path in paths)
     zero = sum(1 for fact in facts if fact.complexity == 0)
-    run_dir.write(SNAPSHOT, Snapshot(files=facts, issues=(), zero_complexity_files=zero))
+    issues, excluded = (
+        build_issues(deps.issues(manifest.target_repo, cutoff), cutoff) if deps.issues else ((), 0)
+    )
+    run_dir.write(
+        SNAPSHOT,
+        Snapshot(
+            files=facts,
+            issues=issues,
+            zero_complexity_files=zero,
+            excluded_issues=excluded,
+            issues_collected=deps.issues is not None,
+        ),
+    )
 
 
 def _facts(path: str, content: bytes, commits: Sequence[CommitChange]) -> FileFacts:

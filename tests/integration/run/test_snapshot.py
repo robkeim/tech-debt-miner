@@ -7,10 +7,12 @@ import pytest
 from support.fixture_repo import Commit, build_fixture_repo, git
 from tech_debt_miner import cli
 from tech_debt_miner.repo import git as repo_git
+from tech_debt_miner.repo import github
+from tech_debt_miner.repo.issues import RawIssue
 from tech_debt_miner.run.artifacts import SNAPSHOT
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
-from tech_debt_miner.types import CommitSubject, Manifest, OutlineEntry
+from tech_debt_miner.types import CommitSubject, Issue, Manifest, OutlineEntry
 
 pytestmark = pytest.mark.integration
 
@@ -57,7 +59,7 @@ def repo(tmp_path: Path) -> Path:
 
 def run_snapshot(tmp_path: Path, repo: Path) -> RunDir:
     run_dir = new_run(tmp_path, repo)
-    snapshot(run_dir, SnapshotDeps(repos_dir=tmp_path / "repos"))
+    snapshot(run_dir, SnapshotDeps(repos_dir=tmp_path / "repos", issues=None))
     return run_dir
 
 
@@ -126,7 +128,7 @@ def test_snapshot_reports_the_files_scored_zero_complexity(tmp_path: Path, repo:
 def test_churn_counts_only_ancestors_of_the_pinned_sha(tmp_path: Path, repo: Path) -> None:
     pinned = git(repo, "rev-list", "--reverse", "HEAD").split()[2]  # the "b" commit
     run_dir = new_run(tmp_path, repo, pinned_sha=pinned)
-    snapshot(run_dir, SnapshotDeps(repos_dir=tmp_path / "repos"))
+    snapshot(run_dir, SnapshotDeps(repos_dir=tmp_path / "repos", issues=None))
 
     churn = {f.path: f.churn for f in run_dir.read(SNAPSHOT).files}
 
@@ -165,11 +167,81 @@ def test_the_exported_tree_is_deleted_afterward(
     assert list(scratch.iterdir()) == []
 
 
+def raw_issue(number: int, created: datetime, last_edited: datetime | None = None) -> RawIssue:
+    edits = (last_edited,) if last_edited else ()
+    return RawIssue(
+        number, f"title {number}", "body", created, last_edited, edits, len(edits), (), 0
+    )
+
+
+def test_snapshot_holds_issues_as_of_the_cutoff_and_counts_the_excluded(
+    tmp_path: Path, repo: Path
+) -> None:
+    raws = [
+        raw_issue(1, at(2023, 5, 1)),
+        raw_issue(2, at(2023, 5, 2), last_edited=at(2024, 2, 1)),
+        raw_issue(3, at(2024, 2, 1)),
+    ]
+    seen: list[tuple[str, date]] = []
+
+    def source(repo_name: str, cutoff: date) -> list[RawIssue]:
+        seen.append((repo_name, cutoff))
+        return raws
+
+    run_dir = new_run(tmp_path, repo)
+    snapshot(run_dir, SnapshotDeps(repos_dir=tmp_path / "repos", issues=source))
+
+    result = run_dir.read(SNAPSHOT)
+    assert result.issues == (Issue(1, "title 1", "body"),)
+    assert result.excluded_issues == 1  # #3 does not exist at the Cutoff date, so it is no loss
+    assert result.issues_collected
+    assert seen == [("owner/target", CUTOFF)]
+
+
+def test_snapshot_without_a_source_records_that_issues_were_skipped(
+    tmp_path: Path, repo: Path
+) -> None:
+    result = run_snapshot(tmp_path, repo).read(SNAPSHOT)
+
+    assert (result.issues, result.excluded_issues, result.issues_collected) == ((), 0, False)
+
+
+def test_cli_snapshot_fetches_issues_through_github(
+    tmp_path: Path, repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fetch(_repo: str, _cutoff: date) -> list[RawIssue]:
+        return [raw_issue(1, at(2023, 5, 1))]
+
+    monkeypatch.setattr(github, "fetch_issues", fetch)
+    run_dir = new_run(tmp_path, repo)
+    argv = ["snapshot", run_dir.id, "--repos-dir", str(tmp_path / "repos")]
+
+    assert cli.main([*argv, "--runs-dir", str(tmp_path / "runs")]) == 0
+    assert [i.number for i in run_dir.read(SNAPSHOT).issues] == [1]
+
+
+def test_cli_snapshot_reports_a_github_failure_and_writes_nothing(
+    tmp_path: Path, repo: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def fail(_repo: str, _cutoff: date) -> list[RawIssue]:
+        msg = "no token"
+        raise github.GitHubError(msg)
+
+    monkeypatch.setattr(github, "fetch_issues", fail)
+    run_dir = new_run(tmp_path, repo)
+    argv = ["snapshot", run_dir.id, "--repos-dir", str(tmp_path / "repos")]
+
+    assert cli.main([*argv, "--runs-dir", str(tmp_path / "runs")]) == 1
+    assert "--no-issues" in capsys.readouterr().err
+    assert not (run_dir.path / "snapshot.json").exists()
+
+
 def test_cli_snapshot_writes_the_artifact(tmp_path: Path, repo: Path) -> None:
     run_dir = new_run(tmp_path, repo)
     argv = [
         "snapshot",
         run_dir.id,
+        "--no-issues",
         "--repos-dir",
         str(tmp_path / "repos"),
         "--runs-dir",

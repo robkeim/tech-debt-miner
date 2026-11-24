@@ -70,6 +70,10 @@ class Snapshot:
     files: tuple[FileFacts, ...]
     issues: tuple[Issue, ...]
     zero_complexity_files: int  # files scored 0: no functions, or lizard could not analyze
+    # Issues that existed at the Cutoff date but were dropped because their history cannot be
+    # proven clean (ADR 0008), and whether issues were collected at all (`--no-issues` skips).
+    excluded_issues: int = 0
+    issues_collected: bool = False
 
 
 @dataclass(frozen=True)
