@@ -63,6 +63,10 @@ flowchart TB
 - Layering is a convention until a policy test enforces it.
 - Splitting `repo/` further, or moving `prompts/` next to `rankers/llm.py`, is cheap later and not decided here.
 
+## Addendum: pure git history rules
+
+The "git runner" in `deps` is not a separate collaborator. `repo/git.py` is the only code that runs `git`, and it keeps one private subprocess runner. Parsing (`repo/history.py`) and the Cutoff date rules (`repo/cutoff.py`) are pure functions over parsed commits, so the boundary rules are unit tested without a repo. This is not a new seam: real git is the only adapter. Pinning reads the whole commit graph with one `git log` and trades memory on very large repos for a bounded number of git calls.
+
 ## Alternatives rejected
 
 - **A `Stage` class hierarchy or plugin registry.** Five fixed stages do not need one.

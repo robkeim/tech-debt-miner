@@ -12,30 +12,19 @@ import tarfile
 import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import date
 from pathlib import Path
 
+from tech_debt_miner.repo.cutoff import commits_in_range, pick_pinned_sha
+from tech_debt_miner.repo.history import (
+    CommitChange,
+    FileChange,
+    GitError,
+    parse_commit_log,
+    parse_graph_log,
+)
 
-class GitError(RuntimeError):
-    """A git command failed or the repo has no history as of the requested date."""
-
-
-@dataclass(frozen=True)
-class FileChange:
-    """One path touched by a commit. `old_path` is set only when the file was renamed."""
-
-    path: str
-    old_path: str | None = None
-
-
-@dataclass(frozen=True)
-class CommitChange:
-    """A non-merge commit with its committer time and the paths it touched."""
-
-    sha: str
-    committed_at: datetime
-    files: tuple[FileChange, ...]
+__all__ = ["CommitChange", "FileChange", "GitError"]
 
 
 def _git(*args: str, cwd: Path | None = None) -> bytes:
@@ -56,10 +45,6 @@ def _git(*args: str, cwd: Path | None = None) -> bytes:
         msg = f"git {' '.join(args)} failed: {stderr}"
         raise GitError(msg)
     return result.stdout
-
-
-def _midnight_utc(day: date) -> datetime:
-    return datetime(day.year, day.month, day.day, tzinfo=UTC)
 
 
 def clone_repo(url: str, dest: Path) -> Path:
@@ -85,27 +70,9 @@ def last_commit_touching(repo: Path, path: str) -> str:
 
 
 def resolve_pinned_sha(repo: Path, cutoff: date) -> str:
-    """Return the newest first-parent commit before the Cutoff date whose history is all earlier.
-
-    A candidate is committed before the Cutoff date and has no ancestor committed on or after it
-    (for example a late-dated side-branch commit that was merged in, or clock skew). If a
-    candidate fails that check, step back along the first-parent line to the next earlier
-    candidate and check again. This walks the full ancestry of each candidate tried.
-    """
-    limit = _midnight_utc(cutoff).timestamp()
-    out = _git("log", "--first-parent", "--format=%H %ct", "HEAD", cwd=repo).decode()
-    for line in out.splitlines():
-        sha, stamp = line.split()
-        if int(stamp) < limit and _newest_commit_time(repo, sha) < limit:
-            return sha
-    msg = f"no commit before {cutoff.isoformat()} with only earlier history"
-    raise GitError(msg)
-
-
-def _newest_commit_time(repo: Path, sha: str) -> int:
-    """Return the latest committer time among `sha` and all its ancestors."""
-    out = _git("log", "--format=%ct", sha, cwd=repo).decode()
-    return max(int(stamp) for stamp in out.split())
+    """Return the newest first-parent commit before the Cutoff date whose history is all earlier."""
+    out = _git("log", "--format=%H %ct %P", "HEAD", cwd=repo).decode()
+    return pick_pinned_sha(parse_graph_log(out), cutoff)
 
 
 def list_commits(repo: Path, since: date, until: date) -> list[CommitChange]:
@@ -114,27 +81,10 @@ def list_commits(repo: Path, since: date, until: date) -> list[CommitChange]:
     Renames are detected, so a renamed file carries its `old_path`. Pass the Cutoff date as
     `until` for as-of history.
     """
-    start = _midnight_utc(since).timestamp()
-    end = _midnight_utc(until).timestamp()
     out = _git(
         "log", "--no-merges", "-M", "--name-status", "--format=%x00%H %ct", "HEAD", cwd=repo
     ).decode()
-    commits: list[CommitChange] = []
-    for block in out.split("\0")[1:]:
-        header, *lines = block.splitlines()
-        sha, stamp = header.split()
-        if not start <= int(stamp) < end:
-            continue
-        files = tuple(_file_change(line) for line in lines if line)
-        commits.append(CommitChange(sha, datetime.fromtimestamp(int(stamp), UTC), files))
-    return commits
-
-
-def _file_change(line: str) -> FileChange:
-    status, *paths = line.split("\t")
-    if status.startswith("R"):
-        return FileChange(path=paths[1], old_path=paths[0])
-    return FileChange(path=paths[0])
+    return commits_in_range(parse_commit_log(out), since, until)
 
 
 @contextmanager
