@@ -7,21 +7,21 @@ Accepted. This ADR is the pre-registration for the experiment.
 - It is merged to `main` before any scored Run. Until then only Dry-runs are allowed, and the numbers below (including the ±0.05 margin) can still change.
 - Each scored Run's Manifest records this ADR's commit SHA, and a policy test should fail a scored Run whose Manifest lacks it. That test does not exist yet and needs its own issue.
 - After the merge, a change needs a new dated amendment ADR, and results are reported under both versions.
-- The label rule (what counts as a bug fix) is decided in #34 and the Target repos and Cutoff dates in #36. This ADR fixes everything downstream of them. The model and its training cutoff are chosen there too and recorded in the Manifest.
+- The Label (what counts as a Fix commit) is decided in [ADR 0004](0004-label-is-future-fix-proneness.md) and the Target repos and Cutoff dates in #36. This ADR fixes everything downstream of them, plus the numeric parameters ADR 0004 leaves to it. The model and its training cutoff are chosen there too and recorded in the Manifest.
 
 ## What is scored
 
-Both rankers (churn × complexity and the LLM) work from the raw repo and issues as of the Cutoff date and order files however they choose. The LLM may output up to 50 files; the baseline may rank everything. Neither is pre-filtered, so what one ignores never changes what the other is scored on. A slot spent on a file with no later fixes scores 0 for the ranker that used it. A file named twice counts once, at its first position, and a file that does not exist at the Pinned SHA scores 0 and still uses its slot. Ground truth is the post-Cutoff bug-fix labels from #34, shared by both.
+Both rankers (churn × complexity and the LLM) work from the raw repo and issues as of the Cutoff date and order files however they choose. The LLM may output up to 50 files; the baseline may rank everything. Neither is pre-filtered, so what one ignores never changes what the other is scored on. A slot spent on a file with a Label of 0 scores 0 for the ranker that used it. A file named twice counts once, at its first position, and a file that does not exist at the Pinned SHA scores 0 and still uses its slot. The ground truth is each file's Label (ADR 0004), shared by both.
 
 | Item | Decision |
 | --- | --- |
-| Primary metric | nDCG@20 with damped gain `1 + log2(count)` (0 for files with no fix) and discount `1 / log2(position + 1)` |
+| Primary metric | nDCG@20 with damped gain `1 + log2(Label)` (0 for files with a Label of 0) and discount `1 / log2(position + 1)` |
 | Co-primary | Recall at 20% of total LOC (the PofB20 convention), effort = physical LOC at the Pinned SHA |
 | Budget rule | Walk the ranking, skip a file that would overflow the budget and continue; unused budget finds nothing |
 | Reported, not decisive | precision@k, nDCG at k = 5, 10 and 50, Spearman for full orderings only |
 | Ties | Average over all tied orderings; never a path-name tie-break |
 | Window | Fixes in `(Cutoff date, Cutoff date + 6 months]`; a Run is not scored until its window has closed |
-| Minimum data | At least 10 files with a qualifying fix per repo and window; exclusions are reported, never dropped silently |
+| Minimum data | At least 10 files with a Label of 1 or more per repo and window; exclusions are reported, never dropped silently |
 | Aggregation | The unit is the repo: repeats are averaged, then Cutoff dates within a repo are averaged. The verdict uses the mean paired difference (LLM minus baseline) with equal weight per repo; every repo is shown |
 | Uncertainty | 3 LLM repeats per repo and Cutoff at temperature 0, averaged per repo; bootstrap 95% CI over repos |
 | Evidence floor | At least 5 scoreable repos for a verdict; the headline claim uses only windows starting after the model's training cutoff, earlier windows are exploratory |
@@ -44,11 +44,12 @@ A CI such as [0.01, 0.04] is therefore Null: positive, but too small to matter. 
 
 Report-only; none can change the verdict. If one flips the direction, the report says so first.
 
-- Binary and raw-count gains
+- Binary and raw-Label gains
 - 3-month and 12-month windows
 - Cyclomatic complexity as the effort proxy
 - k = 5, 10 and 50
-- Keyword-only versus tracker-confirmed labels, if #34 adopts both
+- Keyword-only versus tracker-confirmed Fix commits (the primary Label is tracker-confirmed, ADR 0004)
+- Fix-size cap N at 5, 10, 20 and uncapped (the primary N is the 90th percentile, fixed before any scored Run, ADR 0004)
 
 ## Why
 
@@ -65,7 +66,7 @@ Report-only; none can change the verdict. If one flips the direction, the report
 ## Alternatives rejected
 
 - **Spearman, precision@k or Popt as primary.** See above; Popt is harder to explain and rests on the same size assumption as recall@20%-LOC.
-- **A shared candidate set or shortlist for both rankers.** It would constrain one ranker to make the other comparable. Scoring both at the same k over the same ground truth achieves the comparison without it.
+- **A shared candidate set or shortlist for both rankers.** It would constrain one ranker to make the other comparable. Scoring both at the same k over the same Labels achieves the comparison without it.
 - **Pooling files across repos.** One large repo would dominate the score.
 - **A p-value from a sign or rank test.** With the few repos we expect, these cannot reach small p-values (five repos cannot go below 0.0625 two-sided on a sign test).
 
