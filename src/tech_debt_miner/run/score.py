@@ -54,7 +54,9 @@ def score(run_dir: RunDir, deps: ScoreDeps) -> RunScores:
         if labeled_files < scoring.MIN_LABELED_FILES
         else ""
     )
-    loc = {} if excluded else {f.path: f.loc for f in run_dir.read(SNAPSHOT).files}
+    files = () if excluded else run_dir.read(SNAPSHOT).files
+    loc = {f.path: f.loc for f in files}
+    complexity = {f.path: round(f.complexity) for f in files}
     result = RunScores(
         labeled_files=labeled_files,
         min_labeled_files=scoring.MIN_LABELED_FILES,
@@ -63,7 +65,7 @@ def score(run_dir: RunDir, deps: ScoreDeps) -> RunScores:
         if excluded
         else {
             ranking_name(*key): scoring.score_ranking(
-                run_dir.read(RANKING, key).groups, labels, loc
+                run_dir.read(RANKING, key).groups, labels, loc, complexity
             )
             for key in keys
         },

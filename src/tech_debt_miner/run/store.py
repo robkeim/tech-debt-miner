@@ -152,6 +152,7 @@ def labels_from_json(data: Mapping[str, Any]) -> Labels:
         fetched=data.get("fetched", False),
         linked_closed_bugs=tuple(data.get("linked_closed_bugs", ())),
         issues_read_at=data.get("issues_read_at", ""),
+        variants={name: dict(counts) for name, counts in data.get("variants", {}).items()},
     )
 
 

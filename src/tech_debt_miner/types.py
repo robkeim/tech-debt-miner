@@ -123,6 +123,9 @@ class Labels:
     # state is read at scoring time (ADR 0006), so this records what that read saw.
     linked_closed_bugs: tuple[int, ...] = ()
     issues_read_at: str = ""
+    # Tracker-confirmed counts under each sensitivity variant ("cap-5", "window-3m", ...). Never
+    # scored as the headline (ADR 0005). "window-12m" is absent when that window was still open.
+    variants: Mapping[str, Mapping[str, int]] = field(default_factory=dict[str, Mapping[str, int]])
 
 
 @dataclass(frozen=True)

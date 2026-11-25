@@ -362,3 +362,27 @@ def test_cli_label_of_an_unknown_run_fails(
 ) -> None:
     assert cli.main(["label", "nope", "--runs-dir", str(tmp_path)]) == 2
     assert "no such Run" in capsys.readouterr().err
+
+
+def test_label_stores_the_sensitivity_variants_and_omits_an_open_12_month_window(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+
+    result = label(run_dir, deps_for(repos_dir), no_bugs)
+
+    assert set(result.variants) == {"cap-5", "cap-10", "cap-20", "cap-none", "window-3m"}
+    assert run_dir.read(LABELS).variants == result.variants
+
+
+def test_label_adds_the_12_month_variant_once_that_window_has_closed(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    late = LabelDeps(
+        repos_dir=repos_dir, clock=lambda: datetime(2025, 2, 1, tzinfo=UTC), update_clone=None
+    )
+
+    result = label(run_dir, late, no_bugs)
+
+    assert "window-12m" in result.variants
