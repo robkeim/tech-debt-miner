@@ -79,14 +79,14 @@ def test_rank_writes_only_the_baseline_ranking(tmp_path: Path) -> None:
     assert not run_dir.exists(REQUESTS)
 
 
-def test_the_run_still_needs_the_llm_rankings_after_rank(tmp_path: Path) -> None:
+def test_rank_leaves_the_run_ranked_until_llm_rankings_exist(tmp_path: Path) -> None:
     run_dir = new_run(tmp_path)
     run_dir.write(SNAPSHOT, SNAPSHOT_VALUE)
 
     rank(run_dir)
 
-    assert run_dir.missing_rankings() == [("llm", 0), ("llm", 1)]
-    assert run_dir.state() is RunState.RESOLVED
+    assert run_dir.missing_rankings() == []
+    assert run_dir.state() is RunState.RANKED
 
 
 def test_rank_twice_gives_the_same_file(tmp_path: Path) -> None:

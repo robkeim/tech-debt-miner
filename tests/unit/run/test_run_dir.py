@@ -5,6 +5,7 @@ from typing import Any
 
 import pytest
 
+from tech_debt_miner.run import run_dir as run_dir_module
 from tech_debt_miner.run.artifacts import (
     ALL,
     LABELS,
@@ -238,22 +239,26 @@ def test_a_fresh_run_is_resolved_and_needs_a_snapshot(tmp_path: Path) -> None:
     assert run.next_stage() is Stage.SNAPSHOT
 
 
-def test_a_snapshot_without_requests_is_still_resolved(tmp_path: Path) -> None:
+def test_a_snapshot_makes_the_run_planned_in_the_heuristic_loop(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
-    assert run.state() is RunState.RESOLVED
-    assert run.next_stage() is Stage.RANK
-
-
-def test_a_planned_run_resumes_at_rank(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    run.write(SNAPSHOT, SNAPSHOT_VALUE)
-    run.append(REQUESTS, REQUEST)
     assert run.state() is RunState.PLANNED
     assert run.next_stage() is Stage.RANK
 
 
-def test_rank_resumes_per_ranking(tmp_path: Path) -> None:
+def test_a_snapshot_without_requests_is_resolved_once_llm_ranking_lands(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(run_dir_module, "LLM_RANKING", True)
+    run = make_run(tmp_path)
+    run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    assert run.state() is RunState.RESOLVED
+    run.append(REQUESTS, REQUEST)
+    assert run.state() is RunState.PLANNED
+
+
+def test_rank_resumes_per_ranking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(run_dir_module, "LLM_RANKING", True)
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
     run.append(REQUESTS, REQUEST)
@@ -270,9 +275,7 @@ def test_rank_resumes_per_ranking(tmp_path: Path) -> None:
 def test_a_ranked_run_resumes_at_label_then_score(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
-    run.append(REQUESTS, REQUEST)
-    for ranking in (Ranking("baseline", 0, ()), Ranking("llm", 0, ()), Ranking("llm", 1, ())):
-        run.write(RANKING, ranking)
+    run.write(RANKING, Ranking("baseline", 0, ()))
     assert run.state() is RunState.RANKED
     assert run.next_stage() is Stage.LABEL
     run.write(LABELS, Labels({}))
