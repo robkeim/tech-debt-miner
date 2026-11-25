@@ -155,10 +155,20 @@ def test_gh_graphql_reports_a_failed_call(monkeypatch: pytest.MonkeyPatch) -> No
         gh_graphql("query", {})
 
 
-def bug_page(nodes: list[tuple[int, str | None]], *, more: bool = False) -> dict[str, Any]:
+def bug_page(
+    nodes: list[tuple[int, str | None]],
+    *,
+    labels: dict[int, list[str]] | None = None,
+    more: bool = False,
+) -> dict[str, Any]:
     info = {"hasNextPage": more, "endCursor": "next" if more else None}
+    by_number = labels or {}
     rows = [
-        {"number": number, "issueType": None if kind is None else {"name": kind}}
+        {
+            "number": number,
+            "issueType": None if kind is None else {"name": kind},
+            "labels": {"nodes": [{"name": name} for name in by_number.get(number, [])]},
+        }
         for number, kind in nodes
     ]
     return {"data": {"repository": {"issues": {"pageInfo": info, "nodes": rows}}}}
@@ -175,6 +185,18 @@ def test_closed_bugs_are_the_closed_issues_typed_bug_across_pages() -> None:
 
     assert github.fetch_closed_bugs("o/r", graphql) == frozenset({1, 4})
     assert [variables["after"] for variables in sent] == [None, "next"]
+
+
+def test_closed_bugs_include_issues_labeled_bug_without_a_type() -> None:
+    page = bug_page(
+        [(1, None), (2, None), (3, "Feature"), (4, "Bug")],
+        labels={1: ["Bug"], 2: ["docs"], 3: ["bug", "x"], 4: ["bug"]},
+    )
+
+    def graphql(_query: str, _variables: Variables) -> Mapping[str, Any]:
+        return page
+
+    assert github.fetch_closed_bugs("o/r", graphql) == frozenset({1, 3, 4})
 
 
 def test_closed_bugs_surface_graphql_errors() -> None:
