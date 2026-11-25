@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.repo.git import resolve_pinned_sha
 from tech_debt_miner.run.artifacts import LABELS, LABELS_12M
 from tech_debt_miner.run.label import (
+    CapMismatchError,
     CloneUpdateError,
     LabelDeps,
     LabelMissingError,
@@ -489,3 +491,50 @@ def test_cli_label_later_writes_labels_12m_and_reports_refusals(
     assert run_dir.exists(LABELS_12M)
     assert cli.main(argv) == 1
     assert "already exists" in capsys.readouterr().err
+
+
+def test_label_records_the_cap_it_was_built_with(tmp_path: Path, repos_dir: Path) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir, max_files=2), no_bugs)
+
+    stored = run_dir.read(LABELS)
+
+    assert (stored.max_files, stored.max_files_recorded) == (2, True)
+
+
+def test_label_later_refuses_a_cap_that_differs_from_labels_json(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir, max_files=2), no_bugs)
+
+    for wrong in (None, 3):
+        with pytest.raises(CapMismatchError, match=r"labels.json \(2\)"):
+            label_later(run_dir, long_deps(repos_dir, max_files=wrong), no_bugs)
+    assert not run_dir.exists(LABELS_12M)
+
+    assert label_later(run_dir, long_deps(repos_dir, max_files=2), no_bugs).max_files == 2
+
+
+def test_label_later_refuses_a_cap_when_labels_json_was_uncapped(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir), no_bugs)
+
+    with pytest.raises(CapMismatchError, match=r"labels.json \(uncapped\)"):
+        label_later(run_dir, long_deps(repos_dir, max_files=2), no_bugs)
+
+
+def test_label_later_skips_the_check_for_labels_json_without_a_recorded_cap(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir, max_files=2), no_bugs)
+    path = run_dir.path / "labels.json"
+    data = json.loads(path.read_text())
+    del data["max_files"], data["max_files_recorded"]
+    path.write_text(json.dumps(data))
+
+    assert run_dir.read(LABELS).max_files_recorded is False
+    assert label_later(run_dir, long_deps(repos_dir, max_files=3), no_bugs).max_files == 3

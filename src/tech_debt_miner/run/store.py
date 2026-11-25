@@ -88,6 +88,8 @@ def labels_from_json(data: Mapping[str, Any]) -> Labels:
         linked_closed_bugs=tuple(data.get("linked_closed_bugs", ())),
         issues_read_at=data.get("issues_read_at", ""),
         variants={name: dict(counts) for name, counts in data.get("variants", {}).items()},
+        max_files=data.get("max_files"),
+        max_files_recorded=data.get("max_files_recorded", False),
     )
 
 

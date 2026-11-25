@@ -126,6 +126,11 @@ class Labels:
     # Tracker-confirmed counts under each sensitivity variant ("cap-5", "window-3m", ...). Never
     # scored as the headline (ADR 0005). "window-12m" is absent when that window was still open.
     variants: Mapping[str, Mapping[str, int]] = field(default_factory=dict[str, Mapping[str, int]])
+    # The fix-size cap N the counts were built with (None is uncapped), so `label-later` can check
+    # its own N (ADR 0022). `max_files_recorded` is False for files written before this field
+    # existed, where None would otherwise be read as "uncapped".
+    max_files: int | None = None
+    max_files_recorded: bool = False
 
 
 @dataclass(frozen=True)

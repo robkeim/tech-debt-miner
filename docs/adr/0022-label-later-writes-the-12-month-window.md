@@ -18,9 +18,9 @@ Accepted 2026-11-25. Decided in #135. Amends [ADR 0021](0021-sensitivity-checks-
 ## Known limits
 
 - The tracker is read again, so a Fix commit whose issue closed or was retyped since the primary read can count in the 12-month window and not in the 6-month one. The 12-month check mixes window length with tracker drift; `issues_read_at` records both reads.
-- Nothing proves the N used equals the one for `labels.json` when `validation.json` is absent.
+- For `labels.json` files written before the amendment below, nothing proves the N used equals the primary's when `validation.json` is absent.
 - Until `label-later` runs and the Run is re-scored, the report shows the 12-month check as n/a.
 
 ## Amendments
 
-None yet.
+- 2026-11-25: `labels.json` now records `max_files` (the N it was built with), and `label-later` refuses when `--max-files` differs from it, so the "Without `validation.json`" gap above is closed for new Runs. `labels.json` files written before this have no recorded N (`max_files_recorded` is false) and skip the check, so the gap remains for them (#141).
