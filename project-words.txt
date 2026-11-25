@@ -60,6 +60,7 @@ hotspot
 hotspots
 httpx
 järvelin
+jsonio
 kekäläinen
 kornia
 koschke

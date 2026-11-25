@@ -9,7 +9,7 @@ import hashlib
 from collections.abc import Mapping
 from pathlib import Path
 
-from tech_debt_miner.run import store
+from tech_debt_miner import jsonio
 from tech_debt_miner.types import Request, Response
 
 
@@ -33,7 +33,7 @@ def cache_key(
         "repeat": request.repeat,
         "attempt": request.attempt,
     }
-    return hashlib.sha256(store.canonical_json(identity).encode("utf-8")).hexdigest()
+    return hashlib.sha256(jsonio.canonical_json(identity).encode("utf-8")).hexdigest()
 
 
 class ResponseCache:
@@ -46,7 +46,7 @@ class ResponseCache:
     def get(self, request: Request, schema: Mapping[str, object] | None = None) -> Response | None:
         path = self._path(cache_key(request, schema, self._settings))
         try:
-            return store.response_from_json(store.read_json(path))
+            return jsonio.response_from_json(jsonio.read_json(path))
         except FileNotFoundError:
             return None
         except ValueError, KeyError, TypeError:
@@ -58,8 +58,8 @@ class ResponseCache:
         response: Response,
         schema: Mapping[str, object] | None = None,
     ) -> None:
-        store.write_json(
-            self._path(cache_key(request, schema, self._settings)), store.to_json(response)
+        jsonio.write_json(
+            self._path(cache_key(request, schema, self._settings)), jsonio.to_json(response)
         )
 
     def _path(self, key: str) -> Path:
