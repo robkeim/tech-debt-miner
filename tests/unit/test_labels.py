@@ -222,3 +222,91 @@ def test_window_starts_the_day_after_the_cutoff_and_closes_after_its_last_day() 
     assert labels.window_start(cutoff) == date(2024, 2, 1)
     assert not labels.window_is_closed(cutoff, date(2024, 7, 31))
     assert labels.window_is_closed(cutoff, date(2024, 8, 1))
+
+
+def fix_of_size(size: int, day: int = 0) -> CommitChange:
+    return commit(f"fix {size}", *(f"f{day}_{i}.py" for i in range(size)), day=day)
+
+
+def test_fix_sizes_count_eligible_files_of_keyword_fixes_only() -> None:
+    commits = [
+        commit("fix a", "a.py", "tests/test_a.py", "notes.md"),
+        commit("fix docs only", "README.md"),
+        commit("add feature", "a.py", "b.py"),
+        commit("fix and refactor", "a.py"),
+        commit("fix bot", "a.py", name="renovate[bot]"),
+    ]
+    assert labels.fix_sizes(commits) == [1]
+
+
+@pytest.mark.parametrize(
+    ("sizes", "expected"),
+    [
+        ([], None),
+        ([7], 7),
+        (list(range(1, 11)), 9),  # ceil(0.9 * 10) = 9th smallest
+        (list(range(1, 12)), 10),  # ceil(0.9 * 11) = 10th smallest
+        ([1] * 9 + [50], 1),
+        ([50, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], 1),  # unsorted input
+        ([1] * 8 + [50, 50], 50),
+    ],
+)
+def test_percentile_cap_is_the_nearest_rank_90th(sizes: list[int], expected: int | None) -> None:
+    assert labels.percentile_cap(sizes) == expected
+
+
+def test_percentile_cap_keeps_at_least_the_percentile_of_fixes() -> None:
+    sizes = [1, 1, 2, 3, 3, 4, 8, 9, 30, 40, 41, 100, 2, 2, 5, 6, 7, 1, 1, 12]
+    cap = labels.percentile_cap(sizes)
+    assert cap is not None
+    assert sum(size <= cap for size in sizes) >= 0.9 * len(sizes)
+
+
+def test_cap_report_runs_each_cap_in_order() -> None:
+    commits = [fix_of_size(1, 0), fix_of_size(2, 1), fix_of_size(3, 2)]
+    files = [f"f{day}_{i}.py" for day in range(3) for i in range(day + 1)]
+    report = labels.cap_report(commits, files, [2, None])
+    assert [
+        (r.max_files, r.fix_commits_dropped, r.files_labeled, r.label_total) for r in report
+    ] == [
+        (2, 1, 3, 3),
+        (None, 0, 6, 6),
+    ]
+
+
+def test_sample_is_seeded_and_ignores_input_order() -> None:
+    commits = [fix_of_size(1, day) for day in range(40)]
+    first = labels.sample_fixes(commits, 5)
+    assert len(first) == labels.SAMPLE_SIZE
+    assert len({c.sha for c in first}) == labels.SAMPLE_SIZE
+    assert labels.sample_fixes(list(reversed(commits)), 5) == first
+    assert labels.sample_fixes(commits, 5, seed=1) != first
+
+
+def test_sample_draws_only_fixes_that_count_under_the_cap() -> None:
+    commits = [
+        fix_of_size(1, 0),
+        fix_of_size(3, 1),
+        commit("add feature", "a.py", day=2),
+        commit("fix docs", "README.md", day=3),
+    ]
+    assert labels.sample_fixes(commits, 2) == [commits[0]]
+
+
+def test_a_small_pool_is_sampled_whole() -> None:
+    commits = [fix_of_size(1, day) for day in range(3)]
+    assert sorted(c.sha for c in labels.sample_fixes(commits, 1)) == sorted(c.sha for c in commits)
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("fix it (#7)", ()),
+        ("fix #3 (#7)", ("#3",)),
+        ("fix it\n\nCloses #4 and #4, see #5", ("#4", "#5")),
+        ("fix it\n\nhttps://github.com/o/r/issues/9", ("/issues/9",)),
+        ("fix it", ()),
+    ],
+)
+def test_issue_references_leave_out_the_pr_suffix(message: str, expected: tuple[str, ...]) -> None:
+    assert labels.issue_references(commit(message)) == expected

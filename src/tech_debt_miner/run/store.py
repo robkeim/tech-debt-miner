@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from _typeshed import DataclassInstance
 
 from tech_debt_miner.types import (
+    CapResult,
     CommitSubject,
     FileFacts,
     Issue,
@@ -26,9 +27,11 @@ from tech_debt_miner.types import (
     Ranking,
     Request,
     Response,
+    ReviewItem,
     RunScores,
     Scores,
     Snapshot,
+    Validation,
 )
 
 
@@ -158,6 +161,27 @@ def scores_from_json(data: Mapping[str, Any]) -> RunScores:
             name: Scores(metrics=dict(scores["metrics"]))
             for name, scores in data["rankings"].items()
         },
+    )
+
+
+def validation_from_json(data: Mapping[str, Any]) -> Validation:
+    return Validation(
+        cap_n=data["cap_n"],
+        fix_commits_sized=data["fix_commits_sized"],
+        cap_report=tuple(CapResult(**row) for row in data["cap_report"]),
+        sample_seed=data["sample_seed"],
+        sample=tuple(
+            ReviewItem(
+                sha=item["sha"],
+                message=item["message"],
+                issue_references=tuple(item["issue_references"]),
+                files=tuple(item["files"]),
+                diff_stat=item["diff_stat"],
+            )
+            for item in data["sample"]
+        ),
+        clone_head=data["clone_head"],
+        fetched=data["fetched"],
     )
 
 

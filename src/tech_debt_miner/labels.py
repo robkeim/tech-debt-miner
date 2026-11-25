@@ -5,15 +5,20 @@ from the Target repo and never touches it.
 """
 
 import calendar
+import random
 import re
 from collections.abc import Collection, Sequence
 from datetime import date, timedelta
 
 from tech_debt_miner.repo.eligibility import is_eligible
 from tech_debt_miner.repo.history import CommitChange
-from tech_debt_miner.types import Labels
+from tech_debt_miner.types import CapResult, Labels
 
 WINDOW_MONTHS = 6  # ADR 0005
+CAP_PERCENTILE = 90  # N is this percentile of fix sizes (ADR 0004)
+CAP_GRID: tuple[int | None, ...] = (5, 10, 20, None)  # the sensitivity caps; None is uncapped
+SAMPLE_SIZE = 30  # Fix commits per Target repo on the review sheet (ADR 0004)
+SAMPLE_SEED = 20260711  # fixed, so the same commits always give the same sheet
 
 _KEYWORD = re.compile(r"\b(?:fix|fixes|fixed|bug|defect|patch)\b", re.IGNORECASE)
 _EXCLUDED_MESSAGE = re.compile(r"refactor|cleanup|rename|merge|bump|revert", re.IGNORECASE)
@@ -71,6 +76,84 @@ def carries_only_pr_number(commit: CommitChange) -> bool:
     if match is None:
         return False
     return _ISSUE_REFERENCE.search(subject[: match.start()] + "\n" + body) is None
+
+
+def eligible_files(commit: CommitChange) -> tuple[str, ...]:
+    """Return the Eligible files `commit` touches, by their paths after the commit."""
+    return tuple(f.path for f in commit.files if is_eligible(f.path))
+
+
+def fix_sizes(commits: Sequence[CommitChange]) -> list[int]:
+    """Return the Eligible-file count of each keyword Fix commit that touches at least one.
+
+    Fix commits with no Eligible file are left out: the cap can never drop them and they put no
+    file in the Label. Nothing here looks at Labels or scores (ADR 0004).
+    """
+    sizes = (len(eligible_files(c)) for c in commits if is_keyword_fix(c))
+    return [size for size in sizes if size > 0]
+
+
+def percentile_cap(sizes: Sequence[int], percent: int = CAP_PERCENTILE) -> int | None:
+    """Return the nearest-rank percentile of `sizes`, or None when there are none.
+
+    Nearest rank is the smallest size with at least `percent` percent of the sizes at or below
+    it, so a cap of N keeps at least that share of the Fix commits.
+    """
+    if not sizes:
+        return None
+    rank = (percent * len(sizes) + 99) // 100
+    return sorted(sizes)[rank - 1]
+
+
+def cap_report(
+    commits: Sequence[CommitChange],
+    cutoff_files: Collection[str],
+    caps: Sequence[int | None],
+) -> tuple[CapResult, ...]:
+    """Return the Label's outcome under each cap, in the order given."""
+    results: list[CapResult] = []
+    for cap in caps:
+        built = build_labels(commits, cutoff_files, cap)
+        counts = list(built.counts.values())
+        results.append(
+            CapResult(
+                max_files=cap,
+                fix_commits_dropped=int(built.stats["fix_commits_dropped_by_cap"]),
+                files_labeled=sum(count > 0 for count in counts),
+                label_total=sum(counts),
+            )
+        )
+    return tuple(results)
+
+
+def sample_fixes(
+    commits: Sequence[CommitChange],
+    max_files: int,
+    count: int = SAMPLE_SIZE,
+    seed: int = SAMPLE_SEED,
+) -> list[CommitChange]:
+    """Return a seeded random sample of the Fix commits that count under the cap.
+
+    The pool is every keyword Fix commit with 1 to `max_files` Eligible files, ordered by SHA
+    so the sample depends only on the seed and the pool. A smaller pool is returned whole.
+    """
+    pool = sorted(
+        (c for c in commits if is_keyword_fix(c) and 0 < len(eligible_files(c)) <= max_files),
+        key=lambda c: c.sha,
+    )
+    rng = random.Random(seed)  # noqa: S311 - a reproducible sample, not security
+    return rng.sample(pool, min(count, len(pool)))
+
+
+def issue_references(commit: CommitChange) -> tuple[str, ...]:
+    """Return the `#N` and `/issues/N` references in the message, apart from a `(#N)` PR suffix.
+
+    These are candidates for a linked issue, not tracker-confirmed ones.
+    """
+    subject, _, body = commit.message.partition("\n")
+    match = _PR_SUFFIX.search(subject)
+    text = (subject[: match.start()] if match else subject) + "\n" + body
+    return tuple(dict.fromkeys(_ISSUE_REFERENCE.findall(text)))
 
 
 def _share(part: int, whole: int) -> float:

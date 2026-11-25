@@ -21,6 +21,7 @@ from tech_debt_miner.types import (
     Request,
     RunScores,
     Snapshot,
+    Validation,
 )
 
 
@@ -78,6 +79,13 @@ COST = Artifact[Mapping[str, float], None](
 )
 LABELS = Artifact[Labels, None](
     "labels", _fixed("labels.json"), store.to_json, store.labels_from_json, Policy.REPLACE
+)
+VALIDATION = Artifact[Validation, None](
+    "validation",
+    _fixed("validation.json"),
+    store.to_json,
+    store.validation_from_json,
+    Policy.CREATE_ONCE,
 )
 PROBE = Artifact[Probe, None](
     "probe", _fixed("probe.json"), store.to_json, store.probe_from_json, Policy.CREATE_ONCE
@@ -137,6 +145,7 @@ ALL: tuple[Artifact[Any, Any], ...] = (
     RESPONSES,
     COST,
     LABELS,
+    VALIDATION,
     PROBE,
     RANKING,
     SCORES,
