@@ -5,7 +5,7 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from tech_debt_miner.llm.cache import ResponseCache, cache_key
+from tech_debt_miner.llm.cache import CorruptEntryError, ResponseCache, cache_key
 from tech_debt_miner.types import Request, Response
 
 pytestmark = pytest.mark.unit
@@ -93,12 +93,13 @@ def test_put_then_get_round_trips(tmp_path: Path) -> None:
     assert cache.get(replace(request, repeat=1)) is None
 
 
-def test_a_corrupt_entry_is_a_miss_and_is_replaced(tmp_path: Path) -> None:
+def test_a_corrupt_entry_raises_and_is_replaced(tmp_path: Path) -> None:
     cache = ResponseCache(tmp_path, {})
     request = Request("llm", 0, 0, "m1", "s", "p", 10)
     cache.put(request, RESPONSE)
     (entry,) = tmp_path.glob("*/*.json")
     entry.write_text("{not json", encoding="utf-8")
-    assert cache.get(request) is None
+    with pytest.raises(CorruptEntryError, match=entry.name):
+        cache.get(request)
     cache.put(request, RESPONSE)
     assert cache.get(request) == RESPONSE

@@ -134,3 +134,22 @@ def test_two_unparsable_replies_fail_loudly_with_both_logged() -> None:
     with pytest.raises(UnparsableOutputError):
         client.complete_parsed(request(), parse_int)
     assert [row.response.text for row in rows] == ["a", "b"]
+
+
+def test_a_corrupt_entry_is_flagged_and_paid_for_once(tmp_path: Path) -> None:
+    cache = ResponseCache(tmp_path, {})
+    LLMClient(Script(), max_usd=1.0, cache=cache).complete(request())
+    (entry,) = tmp_path.glob("*/*.json")
+    entry.write_text("{not json", encoding="utf-8")
+    log: list[Mapping[str, object]] = []
+    transport = Script()
+    client = LLMClient(transport, max_usd=1.0, cache=cache, log=log.append)
+    assert client.complete(request()) == OK
+    assert len(transport.calls) == 1
+    flagged = [row for row in log if "cache_corrupt" in row]
+    assert len(flagged) == 1
+    assert entry.name in str(flagged[0]["cache_corrupt"])
+    assert flagged[0]["cache_hit"] is False
+    assert client.complete(request()) == OK  # replaced: a clean hit now
+    assert len(transport.calls) == 1
+    assert len([row for row in log if "cache_corrupt" in row]) == 1
