@@ -44,7 +44,7 @@ A commit on the Target repo's default branch that is identified as a bug fix by 
 _Avoid_: Bug commit, fixing commit
 
 **Tracker-confirmed Fix commit**:
-A Fix commit of the primary set: it links an issue (`#N` or an `/issues/N` URL, never a bare number or a trailing `(#N)` PR number) that is closed and typed Bug when `label` runs ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The keyword-only set is the sensitivity check.
+A Fix commit of the primary set: it links an issue (`#N` or an `/issues/N` URL, never a bare number or a trailing `(#N)` PR number) that is closed and typed Bug or labeled `bug` when `label` runs ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The keyword-only set is the sensitivity check.
 _Avoid_: Confirmed bug, linked fix
 
 **Label**:
