@@ -124,6 +124,8 @@ def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
         files=tuple(_file_facts_from_json(file) for file in data["files"]),
         issues=tuple(Issue(**issue) for issue in data["issues"]),
         zero_complexity_files=data["zero_complexity_files"],
+        excluded_issues=data.get("excluded_issues", 0),
+        issues_collected=data.get("issues_collected", False),
     )
 
 

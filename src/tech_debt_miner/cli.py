@@ -21,7 +21,7 @@ from tech_debt_miner.llm.client import (
     LLMError,
     load_api_key,
 )
-from tech_debt_miner.repo import git
+from tech_debt_miner.repo import git, github
 from tech_debt_miner.run.artifacts import MANIFEST, RESPONSES, SNAPSHOT
 from tech_debt_miner.run.label import (
     CapMismatchError,
@@ -81,6 +81,9 @@ def _parser() -> argparse.ArgumentParser:
 
     snapshot_cmd = commands.add_parser("snapshot", help="write snapshot.json for a Run")
     snapshot_cmd.add_argument("run_id")
+    snapshot_cmd.add_argument(
+        "--no-issues", action="store_true", help="skip fetching issues from GitHub (offline use)"
+    )
     snapshot_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     snapshot_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
@@ -140,7 +143,14 @@ def _snapshot(args: argparse.Namespace) -> int:
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
+    deps = SnapshotDeps(
+        repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
+    )
+    try:
+        snapshot(run_dir, deps)
+    except github.GitHubError as error:
+        print(f"{error} (pass --no-issues to skip issues)", file=sys.stderr)
+        return 1
     return 0
 
 

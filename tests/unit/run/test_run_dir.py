@@ -119,6 +119,8 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
             ),
             issues=(Issue(number=1, title="t", body="b"),),
             zero_complexity_files=4,
+            excluded_issues=2,
+            issues_collected=True,
         ),
         None,
     ),

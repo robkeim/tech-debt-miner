@@ -94,3 +94,7 @@ ADR 0005 lets both rankers see issues as of the Cutoff date. Issue state is rebu
 - **A `dry_run` marker or `runs/dry/`.** A second source of truth, and promotion needs a mutation or a move.
 - **Dropping issue text from the prompt.** The safest, but it changes the experiment ADR 0005 describes.
 - **Excluding issues by `updated_at`.** Any later comment bumps it, so most long-lived issues would go.
+
+## Amendments
+
+- 2026-11-24: The issue-history spike (#73) resolved the last Known limit. GraphQL `userContentEdits` and `lastEditedAt` are readable on a public repo with any authenticated token, and `lastEditedAt` is the time of the newest body edit. The snapshot keeps an issue only when `lastEditedAt` is empty or before the Cutoff date, every fetched edit is before it, and the edit and rename histories were fetched in full (the first 100 entries; a longer history counts as unprovable). Otherwise it excludes the issue and counts it in `snapshot.json` as `excluded_issues`. An issue created on or after the Cutoff date does not exist yet and is dropped without being counted. The title comes from the rename events. `snapshot --no-issues` skips the GitHub calls and sets `issues_collected` to false. Title edits and comment edits are not body edits, so only renames are replayed.
