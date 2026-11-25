@@ -16,7 +16,7 @@ from typing import Literal, Protocol
 import anthropic
 import httpx2
 
-from tech_debt_miner.llm.cache import ResponseCache
+from tech_debt_miner.llm.cache import CorruptEntryError, ResponseCache
 from tech_debt_miner.types import LoggedResponse, Request, Response
 
 DEFAULT_MAX_USD = 4.0  # ADR 0010; raised only via `--max-usd`
@@ -246,7 +246,7 @@ class LLMClient:
             raise UnparsableOutputError(msg) from error
 
     def complete(self, request: Request, schema: Mapping[str, object] | None = None) -> Response:
-        if self._cache is not None and (hit := self._cache.get(request, schema)) is not None:
+        if self._cache is not None and (hit := self._lookup(request, schema)) is not None:
             self._record(request, 0, response=hit, cache_hit=True)
             self._log_response(request, hit, cache_hit=True)
             return hit
@@ -292,6 +292,15 @@ class LLMClient:
             return response
         raise AssertionError  # pragma: no cover - the loop always returns or raises
 
+    def _lookup(self, request: Request, schema: Mapping[str, object] | None) -> Response | None:
+        """Read the cache; a corrupt entry is a paid miss, so flag it in the per-attempt log."""
+        assert self._cache is not None  # noqa: S101 - callers check; narrows the type
+        try:
+            return self._cache.get(request, schema)
+        except CorruptEntryError as error:
+            self._record(request, 0, cache_corrupt=redact(str(error), self._secrets))
+            return None
+
     def _record(  # noqa: PLR0913 - keyword-only fields of one log record
         self,
         request: Request,
@@ -301,6 +310,7 @@ class LLMClient:
         cost: float = 0.0,
         error: str | None = None,
         cache_hit: bool = False,
+        cache_corrupt: str | None = None,
     ) -> None:
         record: dict[str, object] = {
             "ranker": request.ranker,
@@ -323,6 +333,8 @@ class LLMClient:
             }
         if error is not None:
             record["error"] = error
+        if cache_corrupt is not None:
+            record["cache_corrupt"] = cache_corrupt
         self._log(record)
 
     def _log_response(self, request: Request, response: Response, *, cache_hit: bool) -> None:

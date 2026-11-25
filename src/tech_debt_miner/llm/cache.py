@@ -36,6 +36,10 @@ def cache_key(
     return hashlib.sha256(store.canonical_json(identity).encode("utf-8")).hexdigest()
 
 
+class CorruptEntryError(Exception):
+    """A cache entry exists but cannot be decoded. The caller treats it as a miss and flags it."""
+
+
 class ResponseCache:
     """One JSON file per entry under `root`, written atomically."""
 
@@ -44,13 +48,18 @@ class ResponseCache:
         self._settings = dict(settings)  # the transport's `settings`; part of every key
 
     def get(self, request: Request, schema: Mapping[str, object] | None = None) -> Response | None:
+        """Return the cached reply, or None on a miss.
+
+        Raises `CorruptEntryError` for an unreadable entry; the next `put` replaces it.
+        """
         path = self._path(cache_key(request, schema, self._settings))
         try:
             return store.response_from_json(store.read_json(path))
         except FileNotFoundError:
             return None
-        except ValueError, KeyError, TypeError:
-            return None  # an unreadable entry is a miss; the next put replaces it
+        except (ValueError, KeyError, TypeError) as error:
+            msg = f"{path.name}: {type(error).__name__}: {error}"
+            raise CorruptEntryError(msg) from error
 
     def put(
         self,
