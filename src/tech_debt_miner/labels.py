@@ -282,19 +282,21 @@ def build_variants(  # noqa: PLR0913 - one input per axis the variants vary
     max_files: int | None,
     closed_bugs: Collection[int],
     cutoff: date,
+    long_window_closed: bool,
 ) -> dict[str, dict[str, int]]:
     """Tracker-confirmed counts under each ADR 0005 sensitivity variant, keyed by variant name.
 
-    `commits` are the 6-month window's and `later_commits` the ones after it, up to 12 months;
-    pass no `later_commits` when that window is still open and the 12-month variant is left
-    out. Windows keep the primary N; caps keep the 6-month window.
+    `commits` are the 6-month window's and `later_commits` the ones after it, up to 12 months.
+    The 12-month variant is left out unless `long_window_closed`, so a closed window with no
+    later commits still gets it (equal to the 6-month counts). Windows keep the primary N; caps
+    keep the 6-month window.
     """
     variants = {
         variant_name(cap): dict(build_labels(commits, cutoff_files, cap, closed_bugs).counts)
         for cap in CAP_GRID
     }
     for name, months in WINDOW_VARIANTS:
-        if months > WINDOW_MONTHS and not later_commits:
+        if months > WINDOW_MONTHS and not long_window_closed:
             continue
         variants[name] = window_counts(
             commits,
