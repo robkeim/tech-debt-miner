@@ -3,8 +3,8 @@
 Post-cutoff commits carry a poison marker in file names and change a tracked file. Post-cutoff
 issues carry it too: one created after the Cutoff date, one whose body was edited after it, and
 one renamed after it. The snapshot covers the baseline's churn and complexity inputs, the LLM
-prompt inputs (head, outline and commit subjects) and the issues; later slices extend this test
-to the prompts themselves.
+prompt inputs (head, outline and commit subjects) and the issues. Both stage prompts are built
+from that snapshot and checked too (ADR 0010).
 """
 
 from collections.abc import Mapping
@@ -15,12 +15,13 @@ from typing import Any
 import pytest
 
 from support.fixture_repo import Commit, build_fixture_repo, head_sha
+from tech_debt_miner.rankers.prompts import build_rank_prompt, build_triage_prompt
 from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.repo.github import fetch_issues
 from tech_debt_miner.run.artifacts import SNAPSHOT
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
-from tech_debt_miner.types import Manifest
+from tech_debt_miner.types import Manifest, Snapshot
 
 pytestmark = pytest.mark.policy
 
@@ -111,6 +112,11 @@ def run_snapshot(tmp_path: Path, repo: Path, *, pinned_sha: str, cutoff: date) -
     return run_dir
 
 
+def stage_prompts(result: Snapshot) -> tuple[str, str]:
+    triage_set = [file.path for file in result.files]
+    return build_triage_prompt(result), build_rank_prompt(result, triage_set)
+
+
 def test_the_snapshot_never_carries_post_cutoff_history(tmp_path: Path, repo: Path) -> None:
     pinned = repo_git.resolve_pinned_sha(repo, CUTOFF)
 
@@ -131,6 +137,9 @@ def test_the_snapshot_never_carries_post_cutoff_history(tmp_path: Path, repo: Pa
         (3, "title as of cutoff", "plain"),
     ]
     assert result.excluded_issues == 1  # the edited one; the later-created one never existed
+    for prompt in stage_prompts(result):
+        assert POISON not in prompt
+        assert "a.py" in prompt  # the prompts do show the file, so the check above is not vacuous
 
 
 def test_the_test_fails_when_the_cutoff_filter_is_disabled(tmp_path: Path, repo: Path) -> None:
@@ -142,3 +151,6 @@ def test_the_test_fails_when_the_cutoff_filter_is_disabled(tmp_path: Path, repo:
     assert POISON in facts.head
     assert POISON in facts.recent_commits[0].subject
     assert POISON in facts.top_level_names[-1]
+    triage, rank = stage_prompts(run_dir.read(SNAPSHOT))
+    assert POISON in triage  # the poisoned names and subjects reach the digest
+    assert POISON in rank  # the poisoned code, names and subjects reach the code prompt

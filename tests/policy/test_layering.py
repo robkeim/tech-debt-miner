@@ -19,6 +19,7 @@ LEAF_MODULES = (
     SRC / "labels.py",
     SRC / "scoring.py",
     SRC / "report.py",
+    SRC / "rankers" / "prompts.py",
     SRC / "llm" / "cache.py",
 )
 ALLOWED = frozenset(
@@ -28,6 +29,7 @@ ALLOWED = frozenset(
         f"{PACKAGE}.repo.history",
         f"{PACKAGE}.repo.cutoff",
         f"{PACKAGE}.repo.eligibility",
+        f"{PACKAGE}.repo.source",
     }
 )
 

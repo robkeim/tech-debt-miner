@@ -5,6 +5,7 @@ import pytest
 
 from support.fixture_repo import Commit, build_fixture_repo, git, head_sha
 from tech_debt_miner import cli
+from tech_debt_miner.rankers.prompts import template_hashes
 from tech_debt_miner.run.artifacts import MANIFEST
 from tech_debt_miner.run.resolve import ADR_FILES, ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir
@@ -85,7 +86,12 @@ def test_resolve_writes_the_manifest_and_creates_the_run_dir(
     assert manifest.model_training_cutoff == "2023-06-30"
     assert manifest.cutoff_minus_training_days == 185
     assert manifest.repeats == 3
-    assert manifest.prompt_hashes == {}
+    assert manifest.prompt_hashes == {
+        **template_hashes(),
+        "digest_max_subjects": "5",
+        "head_lines": "150",
+        "triage_set_size": "100",
+    }
     assert manifest.lizard_version == "1.17.0"
     assert manifest.tool_sha == head_sha(tool_root)
     assert set(manifest.adr_shas) == {"0005", "0007", "0012"}
