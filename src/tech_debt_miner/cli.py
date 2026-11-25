@@ -12,6 +12,7 @@ from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 
+from tech_debt_miner.jsonio import write_atomic
 from tech_debt_miner.llm.client import (
     DEFAULT_MAX_USD,
     AnthropicTransport,
@@ -41,7 +42,6 @@ from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, Stage
 from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 from tech_debt_miner.run.stages import StageDeps, resume
-from tech_debt_miner.run.store import write_atomic
 from tech_debt_miner.run.validate import render, validate
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
