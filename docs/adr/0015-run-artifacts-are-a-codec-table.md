@@ -20,3 +20,7 @@ Accepted 2026-11-24. Decided in #103. Refines the "One `RunDir` class" rule in [
 
 - `key` is `K | None` rather than an overload per artifact, so a missing key on a keyed artifact is a runtime `TypeError`, not a type error.
 - `cost` and `responses` keep identity codecs. Giving them core types would change the on-disk contract and is a separate decision.
+
+## Amendments
+
+- 2026-11-25: `cost` now has the `Cost` core type and its own codec, and its on-disk shape is `{"attempts": [...]}` (#84, see the 2026-11-25 note in [ADR 0008](0008-pipeline-stages-artifacts-and-resume.md)). The identity-codec line above no longer holds for `cost`.

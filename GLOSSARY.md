@@ -29,7 +29,7 @@ Re-scoring a Run from its logged LLM responses (`responses.jsonl`) without calli
 _Avoid_: Rerun (a rerun calls the LLM again)
 
 **Response cache**:
-A local store of LLM responses keyed by the exact request, repeat index and attempt index ([ADR 0017](docs/adr/0017-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
+A local store of LLM responses keyed by the exact request, the transport's thinking and effort settings, repeat index and attempt index ([ADR 0017](docs/adr/0017-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
@@ -48,7 +48,7 @@ A Fix commit of the primary set: it links an issue (`#N` or an `/issues/N` URL, 
 _Avoid_: Confirmed bug, linked fix
 
 **Label**:
-The per-file ground truth: the number of distinct tracker-confirmed Fix commits touching the file after the Cutoff date (`counts` in `labels.json`; the keyword-only set is `keyword_counts`), counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
+The per-file ground truth: the number of distinct tracker-confirmed Fix commits touching the file after the Cutoff date (`counts` in `labels.json`; the keyword-only set is `keyword_counts`, and `variants` holds the report-only caps and 3- and 12-month windows of [ADR 0021](docs/adr/0021-sensitivity-checks-in-report.md)), counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Fix size**:

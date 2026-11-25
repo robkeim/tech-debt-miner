@@ -123,6 +123,9 @@ class Labels:
     # state is read at scoring time (ADR 0006), so this records what that read saw.
     linked_closed_bugs: tuple[int, ...] = ()
     issues_read_at: str = ""
+    # Tracker-confirmed counts under each sensitivity variant ("cap-5", "window-3m", ...). Never
+    # scored as the headline (ADR 0005). "window-12m" is absent when that window was still open.
+    variants: Mapping[str, Mapping[str, int]] = field(default_factory=dict[str, Mapping[str, int]])
 
 
 @dataclass(frozen=True)
@@ -196,6 +199,25 @@ class Probe:
     expected_path: str  # the one eligible file that commit changed
     answer: str  # the path the model named; empty when the reply was unusable
     hit: bool  # the answer is exactly the expected path
+
+
+@dataclass(frozen=True)
+class CostAttempt:
+    """One invocation's slice of a Run's spend, with the `--max-usd` cap it ran under."""
+
+    max_usd: float
+    spent_usd: float  # spent by this invocation alone
+
+
+@dataclass(frozen=True)
+class Cost:
+    """A Run's `cost.json`: the attempts, oldest first. Their sum is the Run's actual spend."""
+
+    attempts: tuple[CostAttempt, ...] = ()
+
+    @property
+    def spent_usd(self) -> float:
+        return sum(attempt.spent_usd for attempt in self.attempts)
 
 
 @dataclass(frozen=True)

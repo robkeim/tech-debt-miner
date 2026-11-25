@@ -50,7 +50,7 @@ def parse_int(text: str) -> int:
 
 
 def test_a_cache_hit_skips_the_transport_and_costs_nothing(tmp_path: Path) -> None:
-    cache = ResponseCache(tmp_path)
+    cache = ResponseCache(tmp_path, {})
     LLMClient(Script(), max_usd=1.0, cache=cache).complete(request())
     client = LLMClient(Failing(), max_usd=0.0000001, cache=cache)
     assert client.complete(request()) == OK
@@ -59,7 +59,7 @@ def test_a_cache_hit_skips_the_transport_and_costs_nothing(tmp_path: Path) -> No
 
 def test_repeats_are_not_collapsed_by_the_cache(tmp_path: Path) -> None:
     transport = Script()
-    client = LLMClient(transport, max_usd=1.0, cache=ResponseCache(tmp_path))
+    client = LLMClient(transport, max_usd=1.0, cache=ResponseCache(tmp_path, {}))
     for repeat in range(3):
         client.complete(request(repeat=repeat))
     assert len(transport.calls) == 3
@@ -68,7 +68,7 @@ def test_repeats_are_not_collapsed_by_the_cache(tmp_path: Path) -> None:
 def test_every_response_is_logged_whether_hit_or_miss(tmp_path: Path) -> None:
     rows: list[LoggedResponse] = []
     client = LLMClient(
-        Script(), max_usd=1.0, cache=ResponseCache(tmp_path), on_response=rows.append
+        Script(), max_usd=1.0, cache=ResponseCache(tmp_path, {}), on_response=rows.append
     )
     client.complete(request())
     client.complete(request())
@@ -80,7 +80,7 @@ def test_every_response_is_logged_whether_hit_or_miss(tmp_path: Path) -> None:
 
 def test_the_per_attempt_log_marks_cache_hits(tmp_path: Path) -> None:
     log: list[Mapping[str, object]] = []
-    client = LLMClient(Script(), max_usd=1.0, cache=ResponseCache(tmp_path), log=log.append)
+    client = LLMClient(Script(), max_usd=1.0, cache=ResponseCache(tmp_path, {}), log=log.append)
     client.complete(request())
     client.complete(request())
     assert [(row["cache_hit"], row["cost_usd"]) for row in log] == [
@@ -100,7 +100,7 @@ def test_unparsable_output_is_retried_once_with_the_next_attempt(tmp_path: Path)
     rows: list[LoggedResponse] = []
     transport = Script("garbage", "42")
     client = LLMClient(
-        transport, max_usd=1.0, cache=ResponseCache(tmp_path), on_response=rows.append
+        transport, max_usd=1.0, cache=ResponseCache(tmp_path, {}), on_response=rows.append
     )
     assert client.complete_parsed(request(), parse_int) == 42
     assert [call.attempt for call in transport.calls] == [0, 1]
@@ -108,7 +108,7 @@ def test_unparsable_output_is_retried_once_with_the_next_attempt(tmp_path: Path)
 
 
 def test_a_cached_bad_reply_does_not_repeat_forever(tmp_path: Path) -> None:
-    cache = ResponseCache(tmp_path)
+    cache = ResponseCache(tmp_path, {})
     first = LLMClient(Script("garbage", "42"), max_usd=1.0, cache=cache)
     first.complete_parsed(request(), parse_int)
     transport = Script()
