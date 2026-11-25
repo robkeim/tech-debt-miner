@@ -22,3 +22,11 @@ SZZ is the family of algorithms that finds bug-introducing commits by taking a b
 **Reporting.** Results state the limitations: no trace-back, the squash share, fixes dropped by the cap, and the validated precision with its interval.
 
 The numeric parameters (N, exclusion globs, window length) belong to the pre-registration in #32.
+
+## Amendments
+
+- 2026-11-25: `validate` (#79) fixes how N and the review sheet are computed ([GLOSSARY.md](../../GLOSSARY.md): Fix size, Fix-size cap N, Review sheet).
+  - **Source of N:** the Fix commits in the closed Label window, the same set `label` counts, so `validate` needs the window closed. Pre-Cutoff fixes were not used because their size distribution may differ from the commits N is applied to. N still uses sizes only.
+  - **Percentile:** nearest rank, 90th. Fix commits touching no Eligible file are left out of it, since they never count toward a Label and would pull N down.
+  - **Review sheet:** samples only Fix commits that count under N (1 to N Eligible files), so the reviewer does not see fixes the cap drops. "Linked issue" means `#N` references found in the message, not tracker-confirmed.
+  - **Enforcement:** `validation.json` is create-once, and `label --max-files` must equal its N when the file exists. It is not required, so Runs without it behave as before.
