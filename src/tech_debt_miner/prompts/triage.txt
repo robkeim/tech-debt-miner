@@ -1,0 +1,9 @@
+You are helping to find the files of a Python repository that are most likely to need bug fixes in the months ahead.
+
+Below is a digest of every source file in the repository as it stood on a fixed date. Each entry gives the file's path and its length in lines of code. Depending on how large the repository is, an entry may also list the file's top-level class and function names, and the subjects of its most recent commits, each tagged with the date it was made.
+
+Choose the $count files you consider most worth a closer look, meaning the files you expect to need the most bug fixes after this date. Return exactly $count distinct paths, each copied exactly as it appears in the digest. The order of your choice does not matter. A later step will read the code of the files you choose and rank them.
+
+Digest:
+
+$digest

@@ -86,3 +86,7 @@ With thinking at `medium` a ranking costs about $0.10 more, and at `high` about 
 - **Showing issue text.** See No issues above.
 - **Month-only dates.** See Commit subjects with days above.
 - **Thinking on by default.** About $10 to $30 more over 96 rankings, which is minor, but it adds variance and there is no evidence yet that it helps. The pilot decides.
+
+## Amendments
+
+- 2026-11-25: [ADR 0022](0022-prompt-templates-and-digest-budget.md) fixes where the prompt templates live and defines the digest overflow budget.
