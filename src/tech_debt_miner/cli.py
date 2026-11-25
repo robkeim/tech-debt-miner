@@ -6,7 +6,7 @@
 import argparse
 import os
 import sys
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, date, datetime
 from functools import partial
 from importlib.metadata import version
@@ -43,6 +43,9 @@ DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K, June 30 2026 (ADR 0006)
 DEFAULT_REPEATS = 3  # ADR 0005
 TOOL_ROOT = Path(__file__).resolve().parents[2]
+
+Handler = Callable[[argparse.Namespace], int]
+RunHandler = Callable[[argparse.Namespace, RunDir], int]
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -126,18 +129,21 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    handlers = {
-        "resolve": _resolve,
-        "snapshot": _snapshot,
-        "rank": _rank,
-        "label": _label,
-        "validate": _validate,
-        "score": _score,
-        "probe": _probe,
-        "resume": _resume,
-        "status": _status,
-    }
-    return handlers[args.command](args)
+    return _COMMANDS[args.command](args)
+
+
+def _with_run(handler: RunHandler) -> Handler:
+    """Open the Run named by the arguments, or print the error and exit 2, then call `handler`."""
+
+    def command(args: argparse.Namespace) -> int:
+        try:
+            run_dir = RunDir.open(args.runs_dir, args.run_id)
+        except RunNotFoundError as error:
+            print(error, file=sys.stderr)
+            return 2
+        return handler(args, run_dir)
+
+    return command
 
 
 def _resolve(args: argparse.Namespace) -> int:
@@ -175,12 +181,7 @@ def _label_deps(args: argparse.Namespace) -> LabelDeps:
     )
 
 
-def _snapshot(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _snapshot(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
         snapshot(run_dir, _snapshot_deps(args))
     except github.GitHubError as error:
@@ -189,12 +190,7 @@ def _snapshot(args: argparse.Namespace) -> int:
     return 0
 
 
-def _rank(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _rank(args: argparse.Namespace, run_dir: RunDir) -> int:
     if not run_dir.exists(SNAPSHOT):
         print(f"run {args.run_id} has no snapshot; run `snapshot` first", file=sys.stderr)
         return 2
@@ -202,12 +198,7 @@ def _rank(args: argparse.Namespace) -> int:
     return 0
 
 
-def _label(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _label(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
         label(run_dir, _label_deps(args), github.fetch_closed_bugs)
     except (WindowOpenError, CloneUpdateError, CapMismatchError, github.GitHubError) as error:
@@ -216,12 +207,7 @@ def _label(args: argparse.Namespace) -> int:
     return 0
 
 
-def _validate(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _validate(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
         result = validate(run_dir, _label_deps(args))
     except (WindowOpenError, CloneUpdateError, FileExistsError) as error:
@@ -231,12 +217,7 @@ def _validate(args: argparse.Namespace) -> int:
     return 0
 
 
-def _score(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _score(_args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
         result = score(run_dir, ScoreDeps(clock=lambda: datetime.now(UTC)))
     except (LabelMissingError, NoRankingsError, FileExistsError) as error:
@@ -247,12 +228,7 @@ def _score(args: argparse.Namespace) -> int:
     return 0
 
 
-def _probe(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _probe(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
         # Dry-run logs nothing: its raiser would otherwise leave an error row in the log.
         client = (
@@ -276,12 +252,7 @@ def _probe(args: argparse.Namespace) -> int:
     return 0
 
 
-def _resume(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _resume(args: argparse.Namespace, run_dir: RunDir) -> int:
     deps = StageDeps(
         snapshot=_snapshot_deps(args),
         label=_label_deps(args),
@@ -302,14 +273,22 @@ def _resume(args: argparse.Namespace) -> int:
     return 0
 
 
-def _status(args: argparse.Namespace) -> int:
-    try:
-        run_dir = RunDir.open(args.runs_dir, args.run_id)
-    except RunNotFoundError as error:
-        print(error, file=sys.stderr)
-        return 2
+def _status(_args: argparse.Namespace, run_dir: RunDir) -> int:
     print(run_dir.state().value)
     return 0
+
+
+_COMMANDS: dict[str, Handler] = {
+    "resolve": _resolve,
+    "snapshot": _with_run(_snapshot),
+    "rank": _with_run(_rank),
+    "label": _with_run(_label),
+    "validate": _with_run(_validate),
+    "score": _with_run(_score),
+    "probe": _with_run(_probe),
+    "resume": _with_run(_resume),
+    "status": _with_run(_status),
+}
 
 
 if __name__ == "__main__":
