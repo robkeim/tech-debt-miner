@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from tech_debt_miner import jsonio
 from tech_debt_miner.run import store
 from tech_debt_miner.types import (
     BASELINE,
@@ -55,15 +56,15 @@ def _fixed(name: str) -> Callable[[None], str]:
 MANIFEST = Artifact[Manifest, None](
     "manifest",
     _fixed("manifest.json"),
-    store.to_json,
+    jsonio.to_json,
     store.manifest_from_json,
     Policy.CREATE_ONCE,
 )
 SNAPSHOT = Artifact[Snapshot, None](
-    "snapshot", _fixed("snapshot.json"), store.to_json, store.snapshot_from_json, Policy.REPLACE
+    "snapshot", _fixed("snapshot.json"), jsonio.to_json, store.snapshot_from_json, Policy.REPLACE
 )
 REQUESTS = Artifact[Request, None](
-    "requests", _fixed("requests.jsonl"), store.to_json, store.request_from_json, Policy.APPEND
+    "requests", _fixed("requests.jsonl"), jsonio.to_json, store.request_from_json, Policy.APPEND
 )
 RESPONSES = Artifact[LoggedResponse, None](
     "responses",
@@ -73,10 +74,10 @@ RESPONSES = Artifact[LoggedResponse, None](
     Policy.APPEND,
 )
 COST = Artifact[Cost, None](
-    "cost", _fixed("cost.json"), store.to_json, store.cost_from_json, Policy.REPLACE
+    "cost", _fixed("cost.json"), jsonio.to_json, store.cost_from_json, Policy.REPLACE
 )
 LABELS = Artifact[Labels, None](
-    "labels", _fixed("labels.json"), store.to_json, store.labels_from_json, Policy.REPLACE
+    "labels", _fixed("labels.json"), jsonio.to_json, store.labels_from_json, Policy.REPLACE
 )
 LABELS_12M = Artifact[LateLabels, None](
     "labels-12m",
@@ -88,12 +89,12 @@ LABELS_12M = Artifact[LateLabels, None](
 VALIDATION = Artifact[Validation, None](
     "validation",
     _fixed("validation.json"),
-    store.to_json,
+    jsonio.to_json,
     store.validation_from_json,
     Policy.CREATE_ONCE,
 )
 PROBE = Artifact[Probe, None](
-    "probe", _fixed("probe.json"), store.to_json, store.probe_from_json, Policy.CREATE_ONCE
+    "probe", _fixed("probe.json"), jsonio.to_json, store.probe_from_json, Policy.CREATE_ONCE
 )
 
 
@@ -120,7 +121,7 @@ def _parse_ranking_key(file_name: str) -> tuple[str, int]:
 RANKING = Artifact[Ranking, tuple[str, int]](
     "ranking",
     _ranking_path,
-    store.to_json,
+    jsonio.to_json,
     store.ranking_from_json,
     Policy.REPLACE,
     keyed=True,
@@ -134,7 +135,7 @@ _SCORES_PREFIX, _SCORES_SUFFIX = "scores-", ".json"
 SCORES = Artifact[RunScores, str](
     "scores",
     lambda scoring_date: f"{_SCORES_PREFIX}{scoring_date}{_SCORES_SUFFIX}",
-    store.to_json,
+    jsonio.to_json,
     store.scores_from_json,
     Policy.CREATE_ONCE,
     keyed=True,
