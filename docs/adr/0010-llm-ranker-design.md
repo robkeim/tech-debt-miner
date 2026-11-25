@@ -90,3 +90,4 @@ With thinking at `medium` a ranking costs about $0.10 more, and at `high` about 
 ## Amendments
 
 - 2026-11-25: [ADR 0023](0023-prompt-templates-and-digest-budget.md) fixes where the prompt templates live, defines the digest overflow budget, and adds the digest and truncation parameters to the Manifest's `prompt_hashes` as strings.
+- 2026-11-25: [ADR 0024](0024-llm-ranker-stage-labels-and-parse-rules.md) labels the two stages apart in the request log, validates the Triage set, and sets the output limits.
