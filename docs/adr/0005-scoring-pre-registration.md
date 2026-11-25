@@ -5,7 +5,7 @@ Accepted. This ADR is the pre-registration for the experiment.
 ## How it is frozen
 
 - It is merged to `main` before any scored Run. Until then only Dry-runs are allowed, and the numbers below (including the ±0.05 margin) can still change.
-- Each scored Run's Manifest records this ADR's commit SHA, and a policy test should fail a scored Run whose Manifest lacks it. `tests/policy/test_pre_registration.py` enforces this (#57) and, per ADR 0012, also requires ADR 0012's SHA.
+- Each scored Run's Manifest records this ADR's commit SHA, and a policy test should fail a scored Run whose Manifest lacks it. `tests/policy/test_pre_registration.py` enforces this (#57) and, per ADR 0012, also requires ADR 0012's SHA (and ADR 0007's, which is frozen the same way).
 - After the merge, a change needs a new dated amendment ADR, and results are reported under both versions.
 - The Label (what counts as a Fix commit) is decided in [ADR 0004](0004-label-is-future-fix-proneness.md) and the Target repos and Cutoff dates in #36. This ADR fixes everything downstream of them, plus the numeric parameters ADR 0004 leaves to it. The model and its training cutoff are chosen there too and recorded in the Manifest.
 

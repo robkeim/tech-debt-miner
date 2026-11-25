@@ -15,8 +15,8 @@ pytestmark = pytest.mark.policy
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNS_DIR = ROOT / "runs"
-# ADR 0005 is the pre-registration; ADR 0012 amends it (#62).
-REQUIRED_ADR_IDS = ("0005", "0012")
+# Frozen before any scored Run: ADR 0005, ADR 0007 (baseline), ADR 0012 (amends 0005).
+REQUIRED_ADR_IDS = ("0005", "0007", "0012")
 SHA = re.compile(r"^[0-9a-f]{40}$")
 
 MANIFEST = Manifest(
@@ -29,7 +29,7 @@ MANIFEST = Manifest(
     repeats=3,
     prompt_hashes={},
     lizard_version="1",
-    adr_shas={"0005": "b" * 40, "0012": "c" * 40},
+    adr_shas={"0005": "b" * 40, "0007": "e" * 40, "0012": "c" * 40},
     tool_sha="d" * 40,
 )
 
@@ -73,11 +73,11 @@ def test_manifest_missing_a_required_adr_fails(adr: str) -> None:
 
 
 def test_manifest_with_a_malformed_sha_fails() -> None:
-    assert violations(replace(MANIFEST, adr_shas={"0005": "", "0012": "xyz"})) != []
+    assert violations(replace(MANIFEST, adr_shas={"0005": "", "0007": "", "0012": "xyz"})) != []
 
 
 def test_empty_adr_shas_fails_both() -> None:
-    assert len(violations(replace(MANIFEST, adr_shas={}))) == 2
+    assert len(violations(replace(MANIFEST, adr_shas={}))) == 3
 
 
 def test_resolve_records_every_required_adr() -> None:
