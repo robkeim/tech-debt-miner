@@ -117,6 +117,7 @@ def test_the_snapshot_never_carries_post_cutoff_history(tmp_path: Path, repo: Pa
     run_dir = run_snapshot(tmp_path, repo, pinned_sha=pinned, cutoff=CUTOFF)
 
     assert POISON not in (run_dir.path / "snapshot.json").read_text(encoding="utf-8")
+    result = run_dir.read(SNAPSHOT)
     (facts,) = result.files
     assert (facts.path, facts.loc, facts.churn, facts.complexity) == ("a.py", 4, 1, 2)
     # The prompt inputs: head, outline, names and subjects come only from before the Cutoff date.
