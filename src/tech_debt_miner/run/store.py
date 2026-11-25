@@ -16,12 +16,17 @@ if TYPE_CHECKING:
 
 from tech_debt_miner.types import (
     CapResult,
+    CommitSubject,
     FileFacts,
     Issue,
     Labels,
+    LoggedResponse,
     Manifest,
+    OutlineEntry,
+    Probe,
     Ranking,
     Request,
+    Response,
     ReviewItem,
     Scores,
     Snapshot,
@@ -106,9 +111,17 @@ def manifest_from_json(data: Mapping[str, Any]) -> Manifest:
     )
 
 
+def _file_facts_from_json(data: Mapping[str, Any]) -> FileFacts:
+    return FileFacts(
+        **{k: v for k, v in data.items() if k not in {"outline", "recent_commits"}},
+        outline=tuple(OutlineEntry(**entry) for entry in data["outline"]),
+        recent_commits=tuple(CommitSubject(**commit) for commit in data["recent_commits"]),
+    )
+
+
 def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
     return Snapshot(
-        files=tuple(FileFacts(**file) for file in data["files"]),
+        files=tuple(_file_facts_from_json(file) for file in data["files"]),
         issues=tuple(Issue(**issue) for issue in data["issues"]),
         zero_complexity_files=data["zero_complexity_files"],
     )
@@ -119,7 +132,11 @@ def request_from_json(data: Mapping[str, Any]) -> Request:
 
 
 def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
-    return Ranking(ranker=data["ranker"], repeat=data["repeat"], paths=tuple(data["paths"]))
+    return Ranking(
+        ranker=data["ranker"],
+        repeat=data["repeat"],
+        groups=tuple(tuple(group) for group in data["groups"]),
+    )
 
 
 def labels_from_json(data: Mapping[str, Any]) -> Labels:
@@ -154,4 +171,40 @@ def validation_from_json(data: Mapping[str, Any]) -> Validation:
         ),
         clone_head=data["clone_head"],
         fetched=data["fetched"],
+    )
+
+
+def probe_from_json(data: Mapping[str, Any]) -> Probe:
+    return Probe(**data)
+
+
+def response_from_json(data: Mapping[str, Any]) -> Response:
+    return Response(
+        text=data["text"],
+        input_tokens=data["input_tokens"],
+        output_tokens=data["output_tokens"],
+        stop_reason=data["stop_reason"],
+        request_id=data["request_id"],
+        model=data["model"],
+    )
+
+
+def logged_response_to_json(logged: LoggedResponse) -> dict[str, Any]:
+    """Flatten to one `responses.jsonl` row: the request identity beside the Response fields."""
+    return {
+        "ranker": logged.ranker,
+        "repeat": logged.repeat,
+        "attempt": logged.attempt,
+        "cache_hit": logged.cache_hit,
+        **to_json(logged.response),
+    }
+
+
+def logged_response_from_json(data: Mapping[str, Any]) -> LoggedResponse:
+    return LoggedResponse(
+        ranker=data["ranker"],
+        repeat=data["repeat"],
+        attempt=data["attempt"],
+        cache_hit=data["cache_hit"],
+        response=response_from_json(data),
     )

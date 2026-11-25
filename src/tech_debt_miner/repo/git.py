@@ -88,7 +88,7 @@ def list_commits(repo: Path, since: date, until: date, rev: str = "HEAD") -> lis
     """
     out = _git(
         "log", "--no-merges", "-M", "--name-status", f"--format={COMMIT_LOG_FORMAT}", rev, cwd=repo
-    ).decode()
+    ).decode(errors="replace")
     return commits_in_range(parse_commit_log(out), since, until)
 
 

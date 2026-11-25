@@ -21,12 +21,17 @@ from tech_debt_miner.run.artifacts import (
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, RunState, Stage, run_id
 from tech_debt_miner.types import (
     CapResult,
+    CommitSubject,
     FileFacts,
     Issue,
     Labels,
+    LoggedResponse,
     Manifest,
+    OutlineEntry,
+    Probe,
     Ranking,
     Request,
+    Response,
     ReviewItem,
     Scores,
     Snapshot,
@@ -100,14 +105,30 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
     "manifest": (MANIFEST, None),
     "snapshot": (
         Snapshot(
-            files=(FileFacts(path="a.py", loc=10, churn=3, complexity=2.5),),
+            files=(
+                FileFacts(
+                    path="a.py",
+                    loc=10,
+                    churn=3,
+                    complexity=2.5,
+                    outline=(OutlineEntry("class", "A", 1, 0),),
+                    head="class A: ...",
+                    truncated_lines=0,
+                    recent_commits=(CommitSubject("2023-06-01", "s"),),
+                ),
+            ),
             issues=(Issue(number=1, title="t", body="b"),),
             zero_complexity_files=4,
         ),
         None,
     ),
     "requests": (Request("llm", 0, 0, "m", "s", "p", 10), None),
-    "responses": ({"text": "hi"}, None),
+    "responses": (
+        LoggedResponse(
+            "llm", 0, 0, cache_hit=False, response=Response("hi", 1, 2, "end_turn", "req", "m")
+        ),
+        None,
+    ),
     "cost": ({"usd": 1.5}, None),
     "labels": (Labels({"a.py": 1}), None),
     "validation": (
@@ -122,7 +143,8 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
         ),
         None,
     ),
-    "ranking": (Ranking("llm", 1, ("a.py",)), ("llm", 1)),
+    "probe": (Probe("c" * 40, "a.py", "b.py", hit=False), None),
+    "ranking": (Ranking("llm", 1, (("a.py",),)), ("llm", 1)),
     "scores": (Scores({"m": 0.1}), "2027-01-31"),
 }
 
@@ -157,7 +179,7 @@ def test_create_once_artifacts_are_never_overwritten(
 
 def test_ranking_key_is_derived_from_the_value(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    run.write(RANKING, Ranking("llm", 2, ("a.py",)))
+    run.write(RANKING, Ranking("llm", 2, (("a.py",),)))
     assert (run.path / "rankings" / "llm-2.json").exists()
 
 

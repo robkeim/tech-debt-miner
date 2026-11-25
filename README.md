@@ -18,12 +18,15 @@ _To be written once the method is settled. Decisions that shape it are recorded 
 
 ```sh
 uv run tdm resolve --repo owner/name --cutoff 2026-07-01   # clones into repos/, prints the Run id
+uv run tdm snapshot <run-id>                                 # writes snapshot.json
+uv run tdm rank <run-id>                                     # writes rankings/baseline.json (tie groups, no LLM yet)
 uv run tdm status <run-id>                                  # resolved, planned, ranked or scored
 uv run tdm validate <run-id> [--no-fetch]                   # computes N, prints the cap report and review sheet
 uv run tdm label <run-id> [--max-files N] [--no-fetch]                   # writes labels.json once the 6-month window has closed
+uv run tdm probe <run-id> [--run] [--max-usd N]                         # canary probe; Dry-run unless --run
 ```
 
-`resolve` writes `runs/<run-id>/manifest.json` once. `label` fast-forwards the Target repo clone first (fast-forward only; it refuses if upstream history was rewritten) and records the clone's HEAD in `labels.json`; pass `--no-fetch` to skip that when offline. `validate` computes the fix-size cap N once the window has closed, writes `validation.json` and prints the Label at N, 5, 10, 20 and uncapped plus a seeded review sheet of 30 Fix commits; pass N to `label --max-files` before any scored Run. The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
+`resolve` writes `runs/<run-id>/manifest.json` once. `label` fast-forwards the Target repo clone first (fast-forward only; it refuses if upstream history was rewritten) and records the clone's HEAD in `labels.json`; pass `--no-fetch` to skip that when offline. `probe` is the behavioral canary from [ADR 0006](docs/adr/0006-target-repos-and-cutoff-dates.md), run after `label` has updated the clone: it sends one post-Cutoff Fix commit message with no repo context and writes `probe.json`, recording whether the model named the file that commit changed. It is reported beside results and never enters the verdict, and the `--run` flag follows the Dry-run default of [ADR 0002](docs/adr/0002-single-llm-client-choke-point.md). `validate` computes the fix-size cap N once the window has closed, writes `validation.json` and prints the Label at N, 5, 10, 20 and uncapped plus a seeded review sheet of 30 Fix commits; pass N to `label --max-files` before any scored Run. The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
 
 ## Development
 

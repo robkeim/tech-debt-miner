@@ -11,9 +11,18 @@ from enum import StrEnum
 from typing import Any
 
 from tech_debt_miner.run import store
-from tech_debt_miner.types import Labels, Manifest, Ranking, Request, Scores, Snapshot, Validation
-
-BASELINE = "baseline"
+from tech_debt_miner.types import (
+    BASELINE,
+    Labels,
+    LoggedResponse,
+    Manifest,
+    Probe,
+    Ranking,
+    Request,
+    Scores,
+    Snapshot,
+    Validation,
+)
 
 
 class Policy(StrEnum):
@@ -58,8 +67,12 @@ SNAPSHOT = Artifact[Snapshot, None](
 REQUESTS = Artifact[Request, None](
     "requests", _fixed("requests.jsonl"), store.to_json, store.request_from_json, Policy.APPEND
 )
-RESPONSES = Artifact[Mapping[str, Any], None](
-    "responses", _fixed("responses.jsonl"), _identity, _identity, Policy.APPEND
+RESPONSES = Artifact[LoggedResponse, None](
+    "responses",
+    _fixed("responses.jsonl"),
+    store.logged_response_to_json,
+    store.logged_response_from_json,
+    Policy.APPEND,
 )
 COST = Artifact[Mapping[str, float], None](
     "cost", _fixed("cost.json"), _identity, dict, Policy.REPLACE
@@ -73,6 +86,9 @@ VALIDATION = Artifact[Validation, None](
     store.to_json,
     store.validation_from_json,
     Policy.CREATE_ONCE,
+)
+PROBE = Artifact[Probe, None](
+    "probe", _fixed("probe.json"), store.to_json, store.probe_from_json, Policy.CREATE_ONCE
 )
 
 
@@ -114,6 +130,7 @@ ALL: tuple[Artifact[Any, Any], ...] = (
     COST,
     LABELS,
     VALIDATION,
+    PROBE,
     RANKING,
     SCORES,
 )

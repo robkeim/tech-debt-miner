@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+BASELINE = "baseline"  # the Baseline ranker's id and the name of its ranking file
+
 
 @dataclass(frozen=True)
 class Manifest:
@@ -22,11 +24,38 @@ class Manifest:
 
 
 @dataclass(frozen=True)
+class OutlineEntry:
+    """A class or function definition. `depth` is 0 at the top level and 1 for a method."""
+
+    kind: str  # "class" or "function"
+    name: str
+    line: int  # 1-based
+    depth: int
+
+
+@dataclass(frozen=True)
+class CommitSubject:
+    """One non-merge commit subject from the Churn window. No author, hash, diff or count."""
+
+    date: str  # committer date in UTC, `YYYY-MM-DD`
+    subject: str
+
+
+@dataclass(frozen=True)
 class FileFacts:
     path: str
     loc: int
     churn: int
     complexity: float
+    outline: tuple[OutlineEntry, ...]  # empty when the file does not parse
+    head: str  # the first `HEAD_LINES` lines, undecodable bytes replaced
+    truncated_lines: int  # lines after the head
+    recent_commits: tuple[CommitSubject, ...]  # newest first, at most `MAX_SUBJECTS`
+
+    @property
+    def top_level_names(self) -> tuple[str, ...]:
+        """The top-level class and function names, in file order."""
+        return tuple(entry.name for entry in self.outline if entry.depth == 0)
 
 
 @dataclass(frozen=True)
@@ -60,7 +89,15 @@ class Request:
 class Ranking:
     ranker: str  # "baseline" or "llm"
     repeat: int  # 0-based; always 0 for the baseline
-    paths: tuple[str, ...]  # most risky first
+    # Tie groups, most risky group first. Files in one group are tied with each other; an LLM
+    # ranking is all singleton groups. Members are stored sorted by path only so the artifact
+    # bytes are deterministic: that order carries no meaning and is not a tie-break (ADR 0019).
+    groups: tuple[tuple[str, ...], ...]
+
+
+def singleton_groups(paths: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    """Return a strict order as tie groups of one file each."""
+    return tuple((path,) for path in paths)
 
 
 @dataclass(frozen=True)
@@ -125,3 +162,24 @@ class Response:
     stop_reason: str
     request_id: str
     model: str  # the model snapshot the provider says it served
+
+
+@dataclass(frozen=True)
+class Probe:
+    """The behavioral canary probe's result for one Run (ADR 0006). Never part of the verdict."""
+
+    commit: str  # the post-Cutoff Fix commit whose message was sent
+    expected_path: str  # the one eligible file that commit changed
+    answer: str  # the path the model named; empty when the reply was unusable
+    hit: bool  # the answer is exactly the expected path
+
+
+@dataclass(frozen=True)
+class LoggedResponse:
+    """One row of a Run's `responses.jsonl`: a Response and the request identity it answers."""
+
+    ranker: str
+    repeat: int
+    attempt: int
+    cache_hit: bool  # True when served from the Response cache, False when the API was called
+    response: Response
