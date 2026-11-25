@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, tzinfo
 from pathlib import Path
 
 import pytest
@@ -6,6 +6,7 @@ import pytest
 from support.fixture_repo import Commit, build_fixture_repo
 from tech_debt_miner import cli
 from tech_debt_miner.repo import git as repo_git
+from tech_debt_miner.repo import github
 from tech_debt_miner.run import snapshot as snapshot_module
 from tech_debt_miner.run.artifacts import LABELS, RANKING, SNAPSHOT
 from tech_debt_miner.run.label import LabelDeps, WindowOpenError
@@ -193,3 +194,33 @@ def test_the_resume_command_rejects_an_unknown_run(
 ) -> None:
     assert cli.main(["resume", "nope", "--runs-dir", str(tmp_path / "runs")]) == 2
     assert "no such Run" in capsys.readouterr().err
+
+
+def test_a_tracker_failure_in_label_reports_without_the_snapshot_hint(
+    tmp_path: Path,
+    repos_dir: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_dir = new_run(tmp_path, repos_dir)
+
+    def down(_repo: str) -> set[int]:
+        msg = "gh is down"
+        raise github.GitHubError(msg)
+
+    monkeypatch.setattr(github, "fetch_closed_bugs", down)
+    # The suite's frozen clock is inside the Label window, so label would refuse first. Move it.
+    monkeypatch.setattr(cli, "datetime", _AfterWindow)
+    args = ["resume", run_dir.id, "--run", "--no-issues", "--no-fetch"]
+    args += ["--repos-dir", str(repos_dir), "--runs-dir", str(tmp_path / "runs")]
+
+    assert cli.main(args) == 1
+    err = capsys.readouterr().err
+    assert "gh is down" in err
+    assert "--no-issues" not in err
+
+
+class _AfterWindow(datetime):
+    @classmethod
+    def now(cls, tz: tzinfo | None = None) -> _AfterWindow:
+        return cls(2024, 8, 1, tzinfo=tz)

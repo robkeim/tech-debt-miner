@@ -33,7 +33,7 @@ from tech_debt_miner.run.label import (
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
-from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
+from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, Stage
 from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 from tech_debt_miner.run.stages import StageDeps, resume
@@ -291,7 +291,9 @@ def _resume(args: argparse.Namespace) -> int:
     try:
         ran = resume(run_dir, deps, run=args.run)
     except github.GitHubError as error:
-        print(f"{error} (pass --no-issues to skip issues)", file=sys.stderr)
+        # Only `snapshot` can be told to skip GitHub; a failure after it has no such flag.
+        hint = "" if run_dir.is_done(Stage.SNAPSHOT) else " (pass --no-issues to skip issues)"
+        print(f"{error}{hint}", file=sys.stderr)
         return 1
     except (WindowOpenError, CloneUpdateError, CapMismatchError, FileExistsError) as error:
         print(error, file=sys.stderr)
