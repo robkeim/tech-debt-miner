@@ -8,8 +8,10 @@ from tech_debt_miner.llm.client import LLMClient
 from tech_debt_miner.rankers.llm import (
     LLM,
     RANK_MAX_TOKENS,
+    RANK_SCHEMA,
     TRIAGE,
     TRIAGE_MAX_TOKENS,
+    TRIAGE_SCHEMA,
     LLMRanker,
     RankFailed,
     parse_ranking,
@@ -77,10 +79,8 @@ def test_two_stages_return_the_stage_2_order_as_singleton_groups() -> None:
     assert (triage.repeat, rank.repeat) == (2, 2)
     assert (triage.attempt, rank.attempt) == (0, 0)
     assert (triage.max_tokens, rank.max_tokens) == (TRIAGE_MAX_TOKENS, RANK_MAX_TOKENS)
-    assert triage_schema is not None
-    assert rank_schema is not None
-    assert "paths" in triage_schema["properties"]  # type: ignore[operator]
-    assert "ranking" in rank_schema["properties"]  # type: ignore[operator]
+    assert triage_schema == TRIAGE_SCHEMA
+    assert rank_schema == RANK_SCHEMA
 
 
 def test_rationales_and_the_triage_set_stay_out_of_the_ranking() -> None:
