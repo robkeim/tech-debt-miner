@@ -43,8 +43,12 @@ _Avoid_: Cutoff test
 A commit on the Target repo's default branch that is identified as a bug fix by the rule in [ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md).
 _Avoid_: Bug commit, fixing commit
 
+**Tracker-confirmed Fix commit**:
+A Fix commit of the primary set: it links an issue (`#N` or an `/issues/N` URL, never a bare number or a trailing `(#N)` PR number) that is closed and typed Bug when `label` runs ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The keyword-only set is the sensitivity check.
+_Avoid_: Confirmed bug, linked fix
+
 **Label**:
-The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date, counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
+The per-file ground truth: the number of distinct tracker-confirmed Fix commits touching the file after the Cutoff date (`counts` in `labels.json`; the keyword-only set is `keyword_counts`), counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Fix size**:

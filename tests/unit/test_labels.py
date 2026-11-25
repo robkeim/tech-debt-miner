@@ -31,7 +31,7 @@ def commit(
 def counts(
     commits: list[CommitChange], files: list[str], max_files: int | None = None
 ) -> dict[str, int]:
-    return dict(labels.build_labels(commits, files, max_files).counts)
+    return dict(labels.build_labels(commits, files, max_files).keyword_counts)
 
 
 @pytest.mark.parametrize(
@@ -149,10 +149,10 @@ def test_commits_with_equal_timestamps_replay_in_git_order() -> None:
 def test_fix_size_cap_drops_large_fixes() -> None:
     commits = [commit("fix wide", "a.py", "b.py", "c.py"), commit("fix narrow", "a.py", day=1)]
     capped = labels.build_labels(commits, ["a.py", "b.py", "c.py"], max_files=2)
-    assert dict(capped.counts) == {"a.py": 1, "b.py": 0, "c.py": 0}
+    assert dict(capped.keyword_counts) == {"a.py": 1, "b.py": 0, "c.py": 0}
     assert capped.stats["fix_commits_dropped_by_cap"] == 1
     uncapped = labels.build_labels(commits, ["a.py", "b.py", "c.py"])
-    assert dict(uncapped.counts) == {"a.py": 2, "b.py": 1, "c.py": 1}
+    assert dict(uncapped.keyword_counts) == {"a.py": 2, "b.py": 1, "c.py": 1}
     assert uncapped.stats["fix_commits_dropped_by_cap"] == 0
 
 
@@ -310,3 +310,74 @@ def test_a_small_pool_is_sampled_whole() -> None:
 )
 def test_issue_references_leave_out_the_pr_suffix(message: str, expected: tuple[str, ...]) -> None:
     assert labels.issue_references(commit(message)) == expected
+
+
+@pytest.mark.parametrize(
+    ("message", "expected"),
+    [
+        ("handle it (#7)", ()),
+        ("handle it, closes #3 (#7)", (3,)),
+        ("handle it\n\nSee https://github.com/o/r/issues/9 and #12", (9, 12)),
+        ("handle it, bug 15", ()),
+    ],
+)
+def test_linked_issues_are_numbers_never_bare_or_the_pr_suffix(
+    message: str, expected: tuple[int, ...]
+) -> None:
+    assert labels.linked_issues(commit(message)) == expected
+
+
+def test_a_tracker_fix_links_a_closed_bug_whatever_the_wording() -> None:
+    assert labels.is_tracker_fix(commit("handle empty input, closes #7"), {7})
+    assert not labels.is_tracker_fix(commit("handle empty input, closes #8"), {7})
+    assert not labels.is_tracker_fix(commit("handle empty input (#7)"), {7})
+    assert not labels.is_tracker_fix(commit("handle empty input, bug 7"), {7})
+
+
+@pytest.mark.parametrize("message", ["refactor parser, closes #7", 'Revert "x", closes #7'])
+def test_a_tracker_fix_keeps_the_message_exclusions(message: str) -> None:
+    assert not labels.is_tracker_fix(commit(message), {7})
+
+
+def test_a_bot_is_never_a_tracker_fix() -> None:
+    assert not labels.is_tracker_fix(commit("handle it, closes #7", name="renovate[bot]"), {7})
+
+
+def test_the_primary_label_counts_tracker_fixes_apart_from_the_keyword_set() -> None:
+    commits = [
+        commit("fix a crash", "a.py", day=0),
+        commit("handle empty input, closes #7", "b.py", day=1),
+        commit("fix it, closes #7", "a.py", "b.py", day=2),
+    ]
+
+    built = labels.build_labels(commits, ["a.py", "b.py"], closed_bugs={7})
+
+    assert dict(built.counts) == {"a.py": 1, "b.py": 2}
+    assert dict(built.keyword_counts) == {"a.py": 2, "b.py": 1}
+    assert built.stats["tracker_fix_commits"] == 2
+
+
+def test_without_closed_bugs_the_primary_label_is_all_zero() -> None:
+    built = labels.build_labels([commit("fix a crash", "a.py")], ["a.py"])
+
+    assert dict(built.counts) == {"a.py": 0}
+    assert dict(built.keyword_counts) == {"a.py": 1}
+
+
+def test_the_cap_drops_wide_tracker_fixes_and_reports_them_separately() -> None:
+    commits = [commit("handle it, closes #7", "a.py", "b.py", "c.py")]
+
+    built = labels.build_labels(commits, ["a.py", "b.py", "c.py"], max_files=2, closed_bugs={7})
+
+    assert sum(built.counts.values()) == 0
+    assert built.stats["tracker_fix_commits_dropped_by_cap"] == 1
+    assert built.stats["fix_commits_dropped_by_cap"] == 0
+
+
+def test_tracker_fixes_follow_renames_like_keyword_fixes() -> None:
+    commits = [
+        commit("move a", FileChange("b.py", old_path="a.py"), day=0),
+        commit("handle it, closes #7", "b.py", day=1),
+    ]
+
+    assert dict(labels.build_labels(commits, ["a.py"], closed_bugs={7}).counts) == {"a.py": 1}

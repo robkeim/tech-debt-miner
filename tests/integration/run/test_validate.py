@@ -22,6 +22,10 @@ BODY = "def f():\n    return 1\n"
 WIDE = {f"w{i}.py": BODY for i in range(12)}
 
 
+def no_bugs(_repo: str) -> set[int]:
+    return set()
+
+
 def at(month: int, day: int) -> datetime:
     return datetime(2024, month, day, 12, tzinfo=UTC)
 
@@ -221,13 +225,13 @@ def test_label_must_use_the_n_that_validate_fixed(tmp_path: Path, repos_dir: Pat
             repos_dir=repos_dir, clock=lambda: AFTER_WINDOW, update_clone=None, max_files=wrong
         )
         with pytest.raises(CapMismatchError, match=r"validation.json \(1\)"):
-            label(run_dir, deps)
+            label(run_dir, deps, no_bugs)
     assert not run_dir.exists(LABELS)
 
     deps = LabelDeps(
         repos_dir=repos_dir, clock=lambda: AFTER_WINDOW, update_clone=None, max_files=1
     )
-    assert label(run_dir, deps).stats["fix_commits_dropped_by_cap"] == 1
+    assert label(run_dir, deps, no_bugs).stats["fix_commits_dropped_by_cap"] == 1
 
 
 def test_cli_label_reports_a_wrong_n(
@@ -235,7 +239,9 @@ def test_cli_label_reports_a_wrong_n(
     repos_dir: Path,
     frozen_clock: time_machine.Traveller,
     capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(cli.github, "fetch_closed_bugs", no_bugs)
     frozen_clock.move_to(AFTER_WINDOW)
     run_dir = make_run(tmp_path, repos_dir)
     validate(run_dir, deps_for(repos_dir))
