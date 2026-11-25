@@ -72,5 +72,6 @@ def test_parse_commit_log_reads_renames_deletes_author_and_message() -> None:
     assert first.files[0].path == "x.py"
     assert (first.author_name, first.author_email) == ("Ann", "ann@x.io")
     assert first.message == "fix it\n\nbody"
+    assert (first.subject, second.subject) == ("fix it", "m")
     assert (second.files[0].path, second.files[0].old_path) == ("new.py", "old.py")
     assert second.files[1] == FileChange("gone.py", deleted=True)

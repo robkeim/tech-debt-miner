@@ -1,7 +1,8 @@
 """The Leakage test: nothing dated after the Cutoff date reaches the snapshot (ADR 0007).
 
 Post-cutoff commits carry a poison marker in file names and change a tracked file. The snapshot
-covers the baseline's churn and complexity inputs; later slices extend this test to prompts.
+covers the baseline's churn and complexity inputs and the LLM prompt inputs (head, outline and
+commit subjects); later slices extend this test to the prompts themselves.
 """
 
 from datetime import UTC, date, datetime
@@ -14,13 +15,14 @@ from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.run.artifacts import SNAPSHOT
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
-from tech_debt_miner.types import FileFacts, Manifest
+from tech_debt_miner.types import Manifest
 
 pytestmark = pytest.mark.policy
 
 CUTOFF = date(2024, 1, 1)
 POISON = "poison_after_cutoff"
 BEFORE = "def f(x):\n    if x:\n        return 1\n    return 0\n"
+AFTER = f"def {POISON}_function():\n    return '{POISON}'\n"
 
 
 def at(year: int, month: int, day: int, hour: int = 12) -> datetime:
@@ -33,8 +35,12 @@ def repo(tmp_path: Path) -> Path:
         tmp_path / "repos" / "target",
         [
             Commit("before", {"a.py": BEFORE}, at(2023, 6, 1)),
-            Commit("on cutoff", {f"{POISON}_edge.py": BEFORE}, at(2024, 1, 1, 0)),
-            Commit("after", {"a.py": BEFORE * 4, f"{POISON}.py": BEFORE}, at(2024, 3, 1)),
+            Commit(f"{POISON} on cutoff", {f"{POISON}_edge.py": BEFORE}, at(2024, 1, 1, 0)),
+            Commit(
+                f"{POISON} after",
+                {"a.py": BEFORE + AFTER, f"{POISON}.py": BEFORE},
+                at(2024, 3, 1),
+            ),
         ],
     )
 
@@ -64,10 +70,22 @@ def test_the_snapshot_never_carries_post_cutoff_history(tmp_path: Path, repo: Pa
     run_dir = run_snapshot(tmp_path, repo, pinned_sha=pinned, cutoff=CUTOFF)
 
     assert POISON not in (run_dir.path / "snapshot.json").read_text(encoding="utf-8")
-    assert run_dir.read(SNAPSHOT).files == (FileFacts("a.py", loc=4, churn=1, complexity=2),)
+    (facts,) = run_dir.read(SNAPSHOT).files
+    assert (facts.path, facts.loc, facts.churn, facts.complexity) == ("a.py", 4, 1, 2)
+    # The prompt inputs: head, outline, names and subjects come only from before the Cutoff date.
+    assert facts.head == BEFORE.rstrip("\n")
+    assert facts.truncated_lines == 0
+    assert [(e.name, e.line) for e in facts.outline] == [("f", 1)]
+    assert facts.top_level_names == ("f",)
+    assert [(c.date, c.subject) for c in facts.recent_commits] == [("2023-06-01", "before")]
 
 
 def test_the_test_fails_when_the_cutoff_filter_is_disabled(tmp_path: Path, repo: Path) -> None:
-    run_dir = run_snapshot(tmp_path, repo, pinned_sha=head_sha(repo), cutoff=date(2099, 1, 1))
+    run_dir = run_snapshot(tmp_path, repo, pinned_sha=head_sha(repo), cutoff=date(2024, 6, 1))
 
-    assert POISON in (run_dir.path / "snapshot.json").read_text(encoding="utf-8")
+    text = (run_dir.path / "snapshot.json").read_text(encoding="utf-8")
+    assert POISON in text
+    (facts,) = (f for f in run_dir.read(SNAPSHOT).files if f.path == "a.py")
+    assert POISON in facts.head
+    assert POISON in facts.recent_commits[0].subject
+    assert POISON in facts.top_level_names[-1]
