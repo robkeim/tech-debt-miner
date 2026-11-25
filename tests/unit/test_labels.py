@@ -394,6 +394,7 @@ def test_variants_cover_every_cap_and_both_windows() -> None:
         max_files=None,
         closed_bugs=set(),
         cutoff=date(2024, 1, 31),
+        long_window_closed=True,
     )
     assert set(got) == {"cap-5", "cap-10", "cap-20", "cap-none", "window-3m", "window-12m"}
 
@@ -410,6 +411,7 @@ def test_variants_use_a_shorter_and_a_longer_window_than_the_primary() -> None:
         max_files=None,
         closed_bugs={7},
         cutoff=date(2024, 1, 31),
+        long_window_closed=True,
     )
     assert got["window-3m"] == {"a.py": 1}
     assert got["window-12m"] == {"a.py": 3}
@@ -422,10 +424,30 @@ def replace_message(c: CommitChange) -> CommitChange:
 
 def test_the_twelve_month_variant_is_left_out_while_that_window_is_open() -> None:
     got = labels.build_variants(
-        [], [], ["a.py"], max_files=None, closed_bugs=set(), cutoff=date(2024, 1, 31)
+        [],
+        [],
+        ["a.py"],
+        max_files=None,
+        closed_bugs=set(),
+        cutoff=date(2024, 1, 31),
+        long_window_closed=False,
     )
     assert "window-12m" not in got
     assert "window-3m" in got
+
+
+def test_a_closed_twelve_month_window_with_no_later_commits_equals_the_six_month_counts() -> None:
+    fixes = [replace_message(commit("fix a", "a.py", day=10))]
+    got = labels.build_variants(
+        fixes,
+        [],
+        ["a.py"],
+        max_files=None,
+        closed_bugs={7},
+        cutoff=date(2024, 1, 31),
+        long_window_closed=True,
+    )
+    assert got["window-12m"] == {"a.py": 1}
 
 
 def test_a_cap_variant_drops_the_wide_fix() -> None:
@@ -437,6 +459,7 @@ def test_a_cap_variant_drops_the_wide_fix() -> None:
         max_files=None,
         closed_bugs={7},
         cutoff=date(2024, 1, 31),
+        long_window_closed=True,
     )
     assert got["cap-none"]["a.py"] == 1
     assert got["cap-5"]["a.py"] == 1
@@ -447,5 +470,6 @@ def test_a_cap_variant_drops_the_wide_fix() -> None:
         max_files=2,
         closed_bugs={7},
         cutoff=date(2024, 1, 31),
+        long_window_closed=True,
     )
     assert narrow["window-3m"]["a.py"] == 0
