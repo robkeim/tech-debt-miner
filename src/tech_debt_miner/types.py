@@ -1,7 +1,7 @@
 """Core types: frozen, plain data. This module imports nothing else from the package."""
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -92,7 +92,15 @@ class Ranking:
 
 @dataclass(frozen=True)
 class Labels:
-    counts: Mapping[str, int]  # path -> number of Fix commits after the Cutoff date
+    counts: Mapping[str, int]  # Cutoff-date path -> number of Fix commits after the Cutoff date
+    stats: Mapping[str, float] = field(
+        default_factory=dict[str, float]
+    )  # ADR 0004 reporting figures
+    # Where the counts came from: the clone's HEAD, its newest commit date (ISO 8601) and
+    # whether the clone was fast-forwarded first.
+    clone_head: str = ""
+    clone_newest_commit: str = ""
+    fetched: bool = False
 
 
 @dataclass(frozen=True)
@@ -110,3 +118,14 @@ class Response:
     stop_reason: str
     request_id: str
     model: str  # the model snapshot the provider says it served
+
+
+@dataclass(frozen=True)
+class LoggedResponse:
+    """One row of a Run's `responses.jsonl`: a Response and the request identity it answers."""
+
+    ranker: str
+    repeat: int
+    attempt: int
+    cache_hit: bool  # True when served from the Response cache, False when the API was called
+    response: Response

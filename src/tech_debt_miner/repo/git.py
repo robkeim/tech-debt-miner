@@ -1,8 +1,8 @@
 """The only code that shells out to `git` (ADR 0009).
 
-A Target repo is cloned once and then only read. Every as-of function treats the Cutoff date as
-midnight UTC and uses committer dates, so a commit dated on or after the Cutoff date is never
-returned.
+A Target repo is cloned once and read; only `fast_forward` (the `label` stage) updates it.
+Every as-of function treats the Cutoff date as midnight UTC and uses committer dates, so a
+commit dated on or after the Cutoff date is never returned.
 """
 
 import io
@@ -12,11 +12,12 @@ import tarfile
 import tempfile
 from collections.abc import Generator
 from contextlib import contextmanager
-from datetime import date
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from tech_debt_miner.repo.cutoff import commits_in_range, pick_pinned_sha
 from tech_debt_miner.repo.history import (
+    COMMIT_LOG_FORMAT,
     CommitChange,
     FileChange,
     GitError,
@@ -82,12 +83,31 @@ def list_commits(repo: Path, since: date, until: date, rev: str = "HEAD") -> lis
     of the tree being analyzed.
 
     Renames are detected, so a renamed file carries its `old_path`. Pass the Cutoff date as
-    `until` for as-of history.
+    `until` for as-of history. Nothing here clamps `until`: the caller owns keeping a window off
+    post-Cutoff commits.
     """
     out = _git(
-        "log", "--no-merges", "-M", "--name-status", "--format=%x00%H %ct %s", rev, cwd=repo
-    ).decode(errors="replace")
+        "log", "--no-merges", "-M", "--name-status", f"--format={COMMIT_LOG_FORMAT}", rev, cwd=repo
+    ).decode()
     return commits_in_range(parse_commit_log(out), since, until)
+
+
+def fast_forward(repo: Path) -> None:
+    """Fetch the clone's upstream and fast-forward to it, or raise GitError if it cannot."""
+    _git("fetch", "--quiet", cwd=repo)
+    _git("merge", "--ff-only", "--quiet", "@{upstream}", cwd=repo)
+
+
+def head_committed_at(repo: Path) -> datetime:
+    """Return the committer time of `HEAD`."""
+    stamp = _git("log", "-1", "--format=%ct", "HEAD", cwd=repo).decode().strip()
+    return datetime.fromtimestamp(int(stamp), UTC)
+
+
+def list_files(repo: Path, sha: str) -> list[str]:
+    """Return every file path in the tree at `sha`."""
+    out = _git("ls-tree", "-r", "--name-only", "-z", sha, cwd=repo).decode()
+    return [path for path in out.split("\0") if path]
 
 
 @contextmanager

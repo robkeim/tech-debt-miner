@@ -19,9 +19,10 @@ _To be written once the method is settled. Decisions that shape it are recorded 
 ```sh
 uv run tdm resolve --repo owner/name --cutoff 2026-07-01   # clones into repos/, prints the Run id
 uv run tdm status <run-id>                                  # resolved, planned, ranked or scored
+uv run tdm label <run-id> [--max-files N] [--no-fetch]                   # writes labels.json once the 6-month window has closed
 ```
 
-`resolve` writes `runs/<run-id>/manifest.json` once. The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
+`resolve` writes `runs/<run-id>/manifest.json` once. `label` fast-forwards the Target repo clone first (fast-forward only; it refuses if upstream history was rewritten) and records the clone's HEAD in `labels.json`; pass `--no-fetch` to skip that when offline. The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
 
 ## Development
 

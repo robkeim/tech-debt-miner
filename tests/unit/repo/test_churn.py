@@ -16,7 +16,7 @@ def count_churn(commits: list[CommitChange], paths: list[str]) -> dict[str, int]
 
 
 def commit(*changes: FileChange) -> CommitChange:
-    return CommitChange("sha", WHEN, changes, "subject")
+    return CommitChange("sha", WHEN, changes, message="subject")
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_groups_commits_per_file_newest_first_through_renames() -> None:
 def test_recent_subjects_keep_the_newest_five_tagged_with_the_utc_date() -> None:
     west = timezone(timedelta(hours=-5))
     commits = [
-        CommitChange("s", datetime(2023, 6, day, 23, 30, tzinfo=west), (), f"c{day}")
+        CommitChange("s", datetime(2023, 6, day, 23, 30, tzinfo=west), (), message=f"c{day}")
         for day in range(7, 0, -1)
     ]
 
