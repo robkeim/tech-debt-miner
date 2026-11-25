@@ -1,4 +1,4 @@
-"""The command line: `resolve`, `snapshot`, `rank`, `label`, `probe`, `status` (ADR 0009)."""
+"""The command line: the five stages, `probe` and `status` (ADR 0009)."""
 
 import argparse
 import os
@@ -25,6 +25,7 @@ from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
+from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
@@ -59,6 +60,10 @@ def _parser() -> argparse.ArgumentParser:
     label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    score_cmd = commands.add_parser("score", help="write scores-<today>.json for a Run")
+    score_cmd.add_argument("run_id")
+    score_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     snapshot_cmd = commands.add_parser("snapshot", help="write snapshot.json for a Run")
     snapshot_cmd.add_argument("run_id")
     snapshot_cmd.add_argument(
@@ -87,17 +92,16 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if args.command == "resolve":
-        return _resolve(args)
-    if args.command == "label":
-        return _label(args)
-    if args.command == "snapshot":
-        return _snapshot(args)
-    if args.command == "probe":
-        return _probe(args)
-    if args.command == "rank":
-        return _rank(args)
-    return _status(args)
+    handlers = {
+        "resolve": _resolve,
+        "label": _label,
+        "score": _score,
+        "snapshot": _snapshot,
+        "probe": _probe,
+        "rank": _rank,
+        "status": _status,
+    }
+    return handlers[args.command](args)
 
 
 def _resolve(args: argparse.Namespace) -> int:
@@ -166,6 +170,22 @@ def _label(args: argparse.Namespace) -> int:
     except (WindowOpenError, CloneUpdateError) as error:
         print(error, file=sys.stderr)
         return 1
+    return 0
+
+
+def _score(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    try:
+        result = score(run_dir, ScoreDeps(clock=lambda: datetime.now(UTC)))
+    except (LabelMissingError, NoRankingsError, FileExistsError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    if result.excluded:
+        print(f"excluded: {result.excluded}")
     return 0
 
 

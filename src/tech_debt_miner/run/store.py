@@ -26,6 +26,7 @@ from tech_debt_miner.types import (
     Ranking,
     Request,
     Response,
+    RunScores,
     Scores,
     Snapshot,
 )
@@ -148,8 +149,16 @@ def labels_from_json(data: Mapping[str, Any]) -> Labels:
     )
 
 
-def scores_from_json(data: Mapping[str, Any]) -> Scores:
-    return Scores(metrics=dict(data["metrics"]))
+def scores_from_json(data: Mapping[str, Any]) -> RunScores:
+    return RunScores(
+        labeled_files=data["labeled_files"],
+        min_labeled_files=data["min_labeled_files"],
+        excluded=data["excluded"],
+        rankings={
+            name: Scores(metrics=dict(scores["metrics"]))
+            for name, scores in data["rankings"].items()
+        },
+    )
 
 
 def probe_from_json(data: Mapping[str, Any]) -> Probe:

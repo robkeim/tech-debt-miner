@@ -123,6 +123,18 @@ class Scores:
 
 
 @dataclass(frozen=True)
+class RunScores:
+    """What `scores-<scoring-date>.json` holds: every ranking's Scores for one Run (ADR 0008)."""
+
+    labeled_files: int  # files with a Label of 1 or more
+    min_labeled_files: int  # the minimum-data rule in force (ADR 0005)
+    excluded: str  # why the Run is excluded from aggregation; empty when it is not
+    rankings: Mapping[
+        str, Scores
+    ]  # ranking name ("baseline", "llm-0") -> Scores; empty if excluded
+
+
+@dataclass(frozen=True)
 class Response:
     """One LLM reply in provider-neutral form. No SDK object ever leaves `llm/client.py`."""
 
