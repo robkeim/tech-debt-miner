@@ -135,7 +135,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _with_run(handler: RunHandler) -> Handler:
     """Open the Run named by the arguments, or print the error and exit 2, then call `handler`."""
 
-    def command(args: argparse.Namespace) -> int:
+    def run_handler(args: argparse.Namespace) -> int:
         try:
             run_dir = RunDir.open(args.runs_dir, args.run_id)
         except RunNotFoundError as error:
@@ -143,7 +143,7 @@ def _with_run(handler: RunHandler) -> Handler:
             return 2
         return handler(args, run_dir)
 
-    return command
+    return run_handler
 
 
 def _resolve(args: argparse.Namespace) -> int:
