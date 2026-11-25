@@ -51,6 +51,11 @@ def is_bot(commit: CommitChange) -> bool:
     )
 
 
+def _passes_exclusions(commit: CommitChange) -> bool:
+    """Return whether the exclusions both label sets share hold: no bot, no excluded word."""
+    return not is_bot(commit) and _EXCLUDED_MESSAGE.search(commit.message) is None
+
+
 def is_keyword_fix(commit: CommitChange) -> bool:
     """Return whether the keyword-only rule with its exclusions holds, before the fix-size cap.
 
@@ -58,11 +63,7 @@ def is_keyword_fix(commit: CommitChange) -> bool:
     (subject and body). The keywords match whole words; the exclusions match as substrings, so
     "refactoring" and "renamed" are excluded too.
     """
-    return (
-        not is_bot(commit)
-        and _KEYWORD.search(commit.message) is not None
-        and _EXCLUDED_MESSAGE.search(commit.message) is None
-    )
+    return _passes_exclusions(commit) and _KEYWORD.search(commit.message) is not None
 
 
 def is_squash_merge(commit: CommitChange) -> bool:
@@ -94,10 +95,8 @@ def is_tracker_fix(commit: CommitChange, closed_bugs: Collection[int]) -> bool:
     The commit must link an issue that is a closed bug. The bot and message exclusions are the
     same as for the keyword set; the keyword itself is not needed.
     """
-    return (
-        not is_bot(commit)
-        and _EXCLUDED_MESSAGE.search(commit.message) is None
-        and any(number in closed_bugs for number in linked_issues(commit))
+    return _passes_exclusions(commit) and any(
+        number in closed_bugs for number in linked_issues(commit)
     )
 
 

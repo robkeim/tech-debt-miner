@@ -35,4 +35,3 @@ The numeric parameters (N, exclusion globs, window length) belong to the pre-reg
   - **Same exclusions:** bots, the message words and the cap N apply to both sets. The primary set does not need a keyword.
   - **Tracker read:** `label` reads every closed issue's type once, after the window check, so the state is that of the scoring date ([ADR 0006](0006-target-repos-and-cutoff-dates.md)). `labels.json` records `issues_read_at` and the `linked_closed_bugs` it saw, and a re-score needs a new Run.
   - **N:** still computed from keyword fix sizes only, as before.
-
