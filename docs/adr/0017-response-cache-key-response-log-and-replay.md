@@ -31,3 +31,7 @@ Accepted. Decided in #83. It fills in the cache layers of [ADR 0008](0008-pipeli
 - **Including `ranker` in the key.** It splits entries for identical API calls and gives up free hits for nothing.
 - **A single JSON or SQLite cache file.** One file per entry needs no locking, survives a crash with at most one lost entry, and can be inspected with `ls`.
 - **Replay served through a fake transport.** It would still need a client and would hide a log that is missing a reply behind a transport error.
+
+## Amendments
+
+- 2026-11-25: The key now also covers the transport's thinking and effort settings ([#119](https://github.com/robkeim/tech-debt-miner/issues/119)), which closes the first "Known limits" item. `AnthropicTransport.settings` supplies them, `ResponseCache(root, settings)` holds them, and `cache_key` hashes them under `settings`. `ranker` stays out. Entries written before this change are orphaned, as the "key is not versioned" limit already says.

@@ -54,6 +54,29 @@ def test_key_changes_with_every_field_the_api_sees(
     assert key != cache_key(request, {**(schema or {}), extra: 1})
 
 
+SETTINGS = st.fixed_dictionaries(
+    {"thinking": st.sampled_from(["off", "adaptive"]), "effort": st.sampled_from(["low", "high"])}
+)
+
+
+@given(REQUESTS, SCHEMAS, SETTINGS)
+def test_key_is_stable_for_identical_settings_and_changes_with_each(
+    request: Request, schema: dict[str, int] | None, settings: dict[str, str]
+) -> None:
+    key = cache_key(request, schema, settings)
+    assert key == cache_key(request, schema, dict(reversed(settings.items())))
+    assert key != cache_key(request, schema, {**settings, "thinking": settings["thinking"] + "x"})
+    assert key != cache_key(request, schema, {**settings, "effort": settings["effort"] + "x"})
+
+
+def test_a_cache_with_other_settings_misses(tmp_path: Path) -> None:
+    request = Request("llm", 0, 0, "m1", "s", "p", 10)
+    ResponseCache(tmp_path, {"thinking": "off", "effort": "high"}).put(request, RESPONSE)
+    assert ResponseCache(tmp_path, {"thinking": "off", "effort": "high"}).get(request) == RESPONSE
+    assert ResponseCache(tmp_path, {"thinking": "adaptive", "effort": "high"}).get(request) is None
+    assert ResponseCache(tmp_path, {"thinking": "off", "effort": "low"}).get(request) is None
+
+
 @given(st.dictionaries(st.text(max_size=3), st.integers(), min_size=2, max_size=4))
 def test_key_ignores_schema_key_order(schema: dict[str, int]) -> None:
     request = Request("llm", 0, 0, "m1", "s", "p", 10)
