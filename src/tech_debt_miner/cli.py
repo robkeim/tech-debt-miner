@@ -47,6 +47,7 @@ from tech_debt_miner.run.validate import render, validate
 DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K, June 30 2026 (ADR 0006)
 DEFAULT_REPEATS = 3  # ADR 0005
+DEFAULT_REPOS_DIR = Path("repos")
 TOOL_ROOT = Path(__file__).resolve().parents[2]
 
 Handler = Callable[[argparse.Namespace], int]
@@ -64,9 +65,27 @@ def _add_report(add_parser: Callable[..., argparse.ArgumentParser]) -> None:
     report_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
 
+def _stage_flags() -> argparse.ArgumentParser:
+    """Return the flags `_stage_deps` reads, so every command that builds stage deps has them."""
+    flags = argparse.ArgumentParser(add_help=False)
+    flags.add_argument("--repos-dir", type=Path, default=DEFAULT_REPOS_DIR)
+    flags.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    flags.add_argument(
+        "--no-fetch", action="store_true", help="skip fast-forwarding the clone (offline use)"
+    )
+    flags.add_argument(
+        "--no-issues", action="store_true", help="skip fetching issues from GitHub (offline use)"
+    )
+    flags.add_argument(
+        "--max-files", type=int, default=None, help="fix-size cap N; omit for uncapped"
+    )
+    return flags
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="tdm")
     commands = parser.add_subparsers(dest="command", required=True)
+    stage_flags = _stage_flags()
 
     resolve_cmd = commands.add_parser("resolve", help="pin the SHA and create a Run directory")
     resolve_cmd.add_argument("--repo", required=True, help="Target repo as owner/name")
@@ -76,43 +95,32 @@ def _parser() -> argparse.ArgumentParser:
         "--training-cutoff", type=date.fromisoformat, default=DEFAULT_TRAINING_CUTOFF
     )
     resolve_cmd.add_argument("--repeats", type=int, default=DEFAULT_REPEATS)
-    resolve_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    resolve_cmd.add_argument("--repos-dir", type=Path, default=DEFAULT_REPOS_DIR)
     resolve_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
-    label_cmd = commands.add_parser("label", help="count Fix commits once the window has closed")
+    label_cmd = commands.add_parser(
+        "label", help="count Fix commits once the window has closed", parents=[stage_flags]
+    )
     label_cmd.add_argument("run_id")
-    label_cmd.add_argument(
-        "--max-files", type=int, default=None, help="fix-size cap N; omit for uncapped"
-    )
-    label_cmd.add_argument(
-        "--no-fetch", action="store_true", help="skip fast-forwarding the clone (offline use)"
-    )
-    label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
-    label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     _add_report(commands.add_parser)
 
-    score_cmd = commands.add_parser("score", help="write scores-<today>.json for a Run")
+    score_cmd = commands.add_parser(
+        "score", help="write scores-<today>.json for a Run", parents=[stage_flags]
+    )
     score_cmd.add_argument("run_id")
-    score_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     validate_cmd = commands.add_parser(
-        "validate", help="compute the fix-size cap N and print the review sheet"
+        "validate",
+        help="compute the fix-size cap N and print the review sheet",
+        parents=[stage_flags],
     )
     validate_cmd.add_argument("run_id")
-    validate_cmd.add_argument(
-        "--no-fetch", action="store_true", help="skip fast-forwarding the clone (offline use)"
-    )
-    validate_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
-    validate_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
-    snapshot_cmd = commands.add_parser("snapshot", help="write snapshot.json for a Run")
-    snapshot_cmd.add_argument("run_id")
-    snapshot_cmd.add_argument(
-        "--no-issues", action="store_true", help="skip fetching issues from GitHub (offline use)"
+    snapshot_cmd = commands.add_parser(
+        "snapshot", help="write snapshot.json for a Run", parents=[stage_flags]
     )
-    snapshot_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
-    snapshot_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    snapshot_cmd.add_argument("run_id")
 
     probe_cmd = commands.add_parser(
         "probe", help="ask the model to name a buggy file from a post-Cutoff Fix commit message"
@@ -120,24 +128,21 @@ def _parser() -> argparse.ArgumentParser:
     probe_cmd.add_argument("run_id")
     probe_cmd.add_argument("--run", action="store_true", help="send the call; default is Dry-run")
     probe_cmd.add_argument("--max-usd", type=float, default=DEFAULT_MAX_USD)
-    probe_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    probe_cmd.add_argument("--repos-dir", type=Path, default=DEFAULT_REPOS_DIR)
     probe_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
     rank_cmd = commands.add_parser("rank", help="write the Baseline ranking for a Run")
     rank_cmd.add_argument("run_id")
     rank_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     resume_cmd = commands.add_parser(
-        "resume", help="run the stages a Run has not finished; skips the done ones"
+        "resume",
+        help="run the stages a Run has not finished; skips the done ones",
+        parents=[stage_flags],
     )
     resume_cmd.add_argument("run_id")
     resume_cmd.add_argument(
         "--run", action="store_true", help="continue past planning; default stops at a Dry-run"
     )
-    resume_cmd.add_argument("--no-issues", action="store_true", help="see `snapshot`")
-    resume_cmd.add_argument("--no-fetch", action="store_true", help="see `label`")
-    resume_cmd.add_argument("--max-files", type=int, default=None, help="see `label`")
-    resume_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
-    resume_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
@@ -164,6 +169,29 @@ def _with_run(handler: RunHandler) -> Handler:
     return run_handler
 
 
+def _now() -> datetime:
+    """Return the one clock the CLI hands to every stage that stamps a date."""
+    return datetime.now(UTC)
+
+
+def _stage_deps(args: argparse.Namespace) -> StageDeps:
+    """Build the deps for every stage from the arguments; the CLI is their composition root."""
+    return StageDeps(
+        snapshot=SnapshotDeps(
+            repos_dir=args.repos_dir,
+            issues=None if args.no_issues else github.fetch_issues,
+        ),
+        label=LabelDeps(
+            repos_dir=args.repos_dir,
+            clock=_now,
+            update_clone=None if args.no_fetch else git.fast_forward,
+            max_files=args.max_files,
+        ),
+        closed_bugs=github.fetch_closed_bugs,
+        score=ScoreDeps(clock=_now),
+    )
+
+
 def _resolve(args: argparse.Namespace) -> int:
     inputs = ResolveInputs(
         repo=args.repo,
@@ -177,31 +205,15 @@ def _resolve(args: argparse.Namespace) -> int:
         runs_dir=args.runs_dir,
         tool_root=TOOL_ROOT,
         lizard_version=version("lizard"),
-        clock=lambda: datetime.now(UTC),
+        clock=_now,
     )
     print(resolve(inputs, deps).id)
     return 0
 
 
-def _snapshot_deps(args: argparse.Namespace) -> SnapshotDeps:
-    return SnapshotDeps(
-        repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
-    )
-
-
-def _label_deps(args: argparse.Namespace) -> LabelDeps:
-    """Build the label stage deps; `validate` has no `--max-files`, so its cap is None."""
-    return LabelDeps(
-        repos_dir=args.repos_dir,
-        clock=lambda: datetime.now(UTC),
-        update_clone=None if args.no_fetch else git.fast_forward,
-        max_files=getattr(args, "max_files", None),
-    )
-
-
 def _snapshot(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
-        snapshot(run_dir, _snapshot_deps(args))
+        snapshot(run_dir, _stage_deps(args).snapshot)
     except github.GitHubError as error:
         print(f"{error} (pass --no-issues to skip issues)", file=sys.stderr)
         return 1
@@ -218,7 +230,8 @@ def _rank(args: argparse.Namespace, run_dir: RunDir) -> int:
 
 def _label(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
-        label(run_dir, _label_deps(args), github.fetch_closed_bugs)
+        deps = _stage_deps(args)
+        label(run_dir, deps.label, deps.closed_bugs)
     except (WindowOpenError, CloneUpdateError, CapMismatchError, github.GitHubError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -227,7 +240,7 @@ def _label(args: argparse.Namespace, run_dir: RunDir) -> int:
 
 def _validate(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
-        result = validate(run_dir, _label_deps(args))
+        result = validate(run_dir, _stage_deps(args).label)
     except (WindowOpenError, CloneUpdateError, FileExistsError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -235,9 +248,9 @@ def _validate(args: argparse.Namespace, run_dir: RunDir) -> int:
     return 0
 
 
-def _score(_args: argparse.Namespace, run_dir: RunDir) -> int:
+def _score(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
-        result = score(run_dir, ScoreDeps(clock=lambda: datetime.now(UTC)))
+        result = score(run_dir, _stage_deps(args).score)
     except (LabelMissingError, NoRankingsError, FileExistsError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -271,7 +284,7 @@ def _probe(args: argparse.Namespace, run_dir: RunDir) -> int:
             if args.run
             else LLMClient(DryRunTransport(), max_usd=args.max_usd)
         )
-        deps = ProbeDeps(repos_dir=args.repos_dir, client=client, today=datetime.now(UTC).date())
+        deps = ProbeDeps(repos_dir=args.repos_dir, client=client, today=_now().date())
         result = run_probe(run_dir, deps)
     except DryRunError:
         print("Dry-run: no call was made; pass --run to send it")
@@ -284,14 +297,8 @@ def _probe(args: argparse.Namespace, run_dir: RunDir) -> int:
 
 
 def _resume(args: argparse.Namespace, run_dir: RunDir) -> int:
-    deps = StageDeps(
-        snapshot=_snapshot_deps(args),
-        label=_label_deps(args),
-        closed_bugs=github.fetch_closed_bugs,
-        score=ScoreDeps(clock=lambda: datetime.now(UTC)),
-    )
     try:
-        ran = resume(run_dir, deps, run=args.run)
+        ran = resume(run_dir, _stage_deps(args), run=args.run)
     except github.GitHubError as error:
         # Only `snapshot` can be told to skip GitHub; a failure after it has no such flag.
         hint = "" if run_dir.is_done(Stage.SNAPSHOT) else " (pass --no-issues to skip issues)"
