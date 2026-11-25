@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 from tech_debt_miner.types import (
     CapResult,
     CommitSubject,
+    Cost,
+    CostAttempt,
     FileFacts,
     Issue,
     Labels,
@@ -187,6 +189,10 @@ def validation_from_json(data: Mapping[str, Any]) -> Validation:
         clone_head=data["clone_head"],
         fetched=data["fetched"],
     )
+
+
+def cost_from_json(data: Mapping[str, Any]) -> Cost:
+    return Cost(attempts=tuple(CostAttempt(**attempt) for attempt in data["attempts"]))
 
 
 def probe_from_json(data: Mapping[str, Any]) -> Probe:

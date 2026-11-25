@@ -13,10 +13,15 @@ from tech_debt_miner.run import store
 from tech_debt_miner.types import Request, Response
 
 
-def cache_key(request: Request, schema: Mapping[str, object] | None = None) -> str:
-    """Return the hex SHA-256 of the request, schema, repeat and attempt.
+def cache_key(
+    request: Request,
+    schema: Mapping[str, object] | None = None,
+    settings: Mapping[str, str] | None = None,
+) -> str:
+    """Return the hex SHA-256 of the request, schema, transport settings, repeat and attempt.
 
-    `ranker` is a label for logs, not part of the call, so it is not in the key.
+    `settings` are the transport's thinking and effort, which change what the model returns for
+    the same text. `ranker` is a label for logs, not part of the call, so it is not in the key.
     """
     identity = {
         "model": request.model,
@@ -24,6 +29,7 @@ def cache_key(request: Request, schema: Mapping[str, object] | None = None) -> s
         "prompt": request.prompt,
         "max_tokens": request.max_tokens,
         "schema": schema,
+        "settings": dict(settings or {}),
         "repeat": request.repeat,
         "attempt": request.attempt,
     }
@@ -33,11 +39,12 @@ def cache_key(request: Request, schema: Mapping[str, object] | None = None) -> s
 class ResponseCache:
     """One JSON file per entry under `root`, written atomically."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, settings: Mapping[str, str]) -> None:
         self._root = root
+        self._settings = dict(settings)  # the transport's `settings`; part of every key
 
     def get(self, request: Request, schema: Mapping[str, object] | None = None) -> Response | None:
-        path = self._path(cache_key(request, schema))
+        path = self._path(cache_key(request, schema, self._settings))
         try:
             return store.response_from_json(store.read_json(path))
         except FileNotFoundError:
@@ -51,7 +58,9 @@ class ResponseCache:
         response: Response,
         schema: Mapping[str, object] | None = None,
     ) -> None:
-        store.write_json(self._path(cache_key(request, schema)), store.to_json(response))
+        store.write_json(
+            self._path(cache_key(request, schema, self._settings)), store.to_json(response)
+        )
 
     def _path(self, key: str) -> Path:
         return self._root / key[:2] / f"{key}.json"

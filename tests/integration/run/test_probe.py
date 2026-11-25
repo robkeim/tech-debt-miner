@@ -9,11 +9,11 @@ from support.fixture_repo import Commit, build_fixture_repo
 from tech_debt_miner import cli
 from tech_debt_miner.llm.client import LLMClient
 from tech_debt_miner.repo.git import resolve_pinned_sha
-from tech_debt_miner.run.artifacts import PROBE, RESPONSES
+from tech_debt_miner.run.artifacts import COST, PROBE, RESPONSES
 from tech_debt_miner.run.label import WindowOpenError
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.run_dir import RunDir
-from tech_debt_miner.types import Manifest, Request, Response
+from tech_debt_miner.types import Cost, CostAttempt, Manifest, Request, Response
 
 pytestmark = pytest.mark.integration
 
@@ -180,3 +180,52 @@ def test_cli_probe_reports_a_second_probe_as_an_error(
     assert cli.main(argv) == 1
 
     assert "already exists" in capsys.readouterr().err
+
+
+def test_cli_probe_of_an_unknown_run_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(["probe", "nope", "--runs-dir", str(tmp_path)]) == 2
+    assert "no such Run" in capsys.readouterr().err
+
+
+def test_cli_probe_refuses_a_resume_whose_cap_is_already_spent(
+    run_dir: RunDir,
+    capsys: pytest.CaptureFixture[str],
+    frozen_clock: time_machine.Traveller,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake")  # cspell:disable-line
+    frozen_clock.move_to(datetime(2024, 8, 1, tzinfo=UTC))
+    run_dir.write(COST, Cost((CostAttempt(4.0, 4.0),)))
+    argv = ["probe", run_dir.id, "--run", "--max-usd", "4"]
+    argv += ["--runs-dir", str(run_dir.path.parent)]
+    argv += ["--repos-dir", str(run_dir.path.parents[1] / "repos")]
+
+    assert cli.main(argv) == 1
+
+    assert "--max-usd" in capsys.readouterr().err
+    assert run_dir.read(COST) == Cost((CostAttempt(4.0, 4.0),))
+
+
+def test_cli_probe_run_logs_the_cap_and_spend_in_cost_json(
+    run_dir: RunDir,
+    frozen_clock: time_machine.Traveller,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frozen_clock.move_to(datetime(2024, 8, 1, tzinfo=UTC))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake")  # cspell:disable-line
+
+    def fake_transport(_key: str) -> FakeTransport:
+        return FakeTransport("{}")
+
+    monkeypatch.setattr(cli, "AnthropicTransport", fake_transport)
+    argv = ["probe", run_dir.id, "--run", "--max-usd", "2.5"]
+    argv += ["--runs-dir", str(run_dir.path.parent)]
+    argv += ["--repos-dir", str(run_dir.path.parents[1] / "repos")]
+
+    assert cli.main(argv) == 0
+
+    [attempt] = run_dir.read(COST).attempts
+    assert attempt.max_usd == 2.5
+    assert attempt.spent_usd == pytest.approx(100 * 2 / 1e6 + 10 * 10 / 1e6)

@@ -29,7 +29,7 @@ Re-scoring a Run from its logged LLM responses (`responses.jsonl`) without calli
 _Avoid_: Rerun (a rerun calls the LLM again)
 
 **Response cache**:
-A local store of LLM responses keyed by the exact request, repeat index and attempt index ([ADR 0017](docs/adr/0017-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
+A local store of LLM responses keyed by the exact request, the transport's thinking and effort settings, repeat index and attempt index ([ADR 0017](docs/adr/0017-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
