@@ -23,6 +23,7 @@ from tech_debt_miner.llm.client import (
 )
 from tech_debt_miner.repo import git, github
 from tech_debt_miner.run.artifacts import MANIFEST, RESPONSES, SNAPSHOT
+from tech_debt_miner.run.cost import open_client
 from tech_debt_miner.run.label import (
     CapMismatchError,
     CloneUpdateError,
@@ -256,7 +257,8 @@ def _probe(args: argparse.Namespace) -> int:
     try:
         # Dry-run logs nothing: its raiser would otherwise leave an error row in the log.
         client = (
-            LLMClient(
+            open_client(
+                run_dir,
                 AnthropicTransport(load_api_key(os.environ, Path(".env"))),
                 max_usd=args.max_usd,
                 on_response=partial(run_dir.append, RESPONSES),

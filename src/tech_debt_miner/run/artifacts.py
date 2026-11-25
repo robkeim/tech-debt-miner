@@ -5,7 +5,7 @@ appends over these definitions. Decoding stays explicit per type (ADR 0009); the
 only points at the decoders in `store`.
 """
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -13,6 +13,7 @@ from typing import Any
 from tech_debt_miner.run import store
 from tech_debt_miner.types import (
     BASELINE,
+    Cost,
     Labels,
     LoggedResponse,
     Manifest,
@@ -50,10 +51,6 @@ def _fixed(name: str) -> Callable[[None], str]:
     return lambda _key: name
 
 
-def _identity[T](value: T) -> T:
-    return value
-
-
 MANIFEST = Artifact[Manifest, None](
     "manifest",
     _fixed("manifest.json"),
@@ -74,8 +71,8 @@ RESPONSES = Artifact[LoggedResponse, None](
     store.logged_response_from_json,
     Policy.APPEND,
 )
-COST = Artifact[Mapping[str, float], None](
-    "cost", _fixed("cost.json"), _identity, dict, Policy.REPLACE
+COST = Artifact[Cost, None](
+    "cost", _fixed("cost.json"), store.to_json, store.cost_from_json, Policy.REPLACE
 )
 LABELS = Artifact[Labels, None](
     "labels", _fixed("labels.json"), store.to_json, store.labels_from_json, Policy.REPLACE
