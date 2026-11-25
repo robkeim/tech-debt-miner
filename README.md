@@ -22,9 +22,10 @@ uv run tdm snapshot <run-id>                                 # writes snapshot.j
 uv run tdm rank <run-id>                                     # writes rankings/baseline.json (tie groups, no LLM yet)
 uv run tdm status <run-id>                                  # resolved, planned, ranked or scored
 uv run tdm label <run-id> [--max-files N] [--no-fetch]                   # writes labels.json once the 6-month window has closed
+uv run tdm probe <run-id> [--run] [--max-usd N]                         # canary probe; Dry-run unless --run
 ```
 
-`resolve` writes `runs/<run-id>/manifest.json` once. `label` fast-forwards the Target repo clone first (fast-forward only; it refuses if upstream history was rewritten) and records the clone's HEAD in `labels.json`; pass `--no-fetch` to skip that when offline. The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
+`resolve` writes `runs/<run-id>/manifest.json` once. `label` fast-forwards the Target repo clone first (fast-forward only; it refuses if upstream history was rewritten) and records the clone's HEAD in `labels.json`; pass `--no-fetch` to skip that when offline. `probe` is the behavioral canary from [ADR 0006](docs/adr/0006-target-repos-and-cutoff-dates.md), run after `label` has updated the clone: it sends one post-Cutoff Fix commit message with no repo context and writes `probe.json`, recording whether the model named the file that commit changed. It is reported beside results and never enters the verdict, and the `--run` flag follows the Dry-run default of [ADR 0002](docs/adr/0002-single-llm-client-choke-point.md). The other stages are not built yet ([ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
 
 ## Development
 

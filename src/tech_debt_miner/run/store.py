@@ -22,6 +22,7 @@ from tech_debt_miner.types import (
     LoggedResponse,
     Manifest,
     OutlineEntry,
+    Probe,
     Ranking,
     Request,
     Response,
@@ -147,6 +148,10 @@ def labels_from_json(data: Mapping[str, Any]) -> Labels:
 
 def scores_from_json(data: Mapping[str, Any]) -> Scores:
     return Scores(metrics=dict(data["metrics"]))
+
+
+def probe_from_json(data: Mapping[str, Any]) -> Probe:
+    return Probe(**data)
 
 
 def response_from_json(data: Mapping[str, Any]) -> Response:

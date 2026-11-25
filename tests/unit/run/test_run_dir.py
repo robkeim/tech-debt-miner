@@ -27,6 +27,7 @@ from tech_debt_miner.types import (
     LoggedResponse,
     Manifest,
     OutlineEntry,
+    Probe,
     Ranking,
     Request,
     Response,
@@ -127,6 +128,7 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
     ),
     "cost": ({"usd": 1.5}, None),
     "labels": (Labels({"a.py": 1}), None),
+    "probe": (Probe("c" * 40, "a.py", "b.py", hit=False), None),
     "ranking": (Ranking("llm", 1, (("a.py",),)), ("llm", 1)),
     "scores": (Scores({"m": 0.1}), "2027-01-31"),
 }

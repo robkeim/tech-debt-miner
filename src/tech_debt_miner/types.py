@@ -131,6 +131,16 @@ class Response:
 
 
 @dataclass(frozen=True)
+class Probe:
+    """The behavioral canary probe's result for one Run (ADR 0006). Never part of the verdict."""
+
+    commit: str  # the post-Cutoff Fix commit whose message was sent
+    expected_path: str  # the one eligible file that commit changed
+    answer: str  # the path the model named; empty when the reply was unusable
+    hit: bool  # the answer is exactly the expected path
+
+
+@dataclass(frozen=True)
 class LoggedResponse:
     """One row of a Run's `responses.jsonl`: a Response and the request identity it answers."""
 
