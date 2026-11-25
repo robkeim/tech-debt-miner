@@ -19,7 +19,7 @@ RANK_TEMPLATE = "rank"
 TRIAGE_SET_SIZE = 100  # the Triage set holds `min(TRIAGE_SET_SIZE, eligible files)`
 RANKING_SIZE = 50  # the most files stage 2 returns
 DIGEST_MAX_SUBJECTS = 5
-# The Dry-run's own conservative ratio (ADR 0010): real code averages nearer 4 characters a token.
+# Conservative: real code averages nearer 4 characters a token (ADR 0022).
 CHARS_PER_TOKEN = 3
 # What the stage 1 digest may use. Sonnet 5.5 reads 1M tokens; the rest is for the template, the
 # output and slack in the estimate. A convention, not a tuned value.
@@ -35,14 +35,18 @@ def estimate_tokens(text: str) -> int:
     return ceil(len(text) / CHARS_PER_TOKEN)
 
 
+def _template_bytes(name: str) -> bytes:
+    return (resources.files("tech_debt_miner") / "prompts" / f"{name}.txt").read_bytes()
+
+
 def load_template(name: str) -> str:
-    return (resources.files("tech_debt_miner") / "prompts" / f"{name}.txt").read_text("utf-8")
+    return _template_bytes(name).decode("utf-8")
 
 
 def template_hashes() -> dict[str, str]:
     """Return each template's SHA-256, for the Manifest."""
     return {
-        name: hashlib.sha256(load_template(name).encode("utf-8")).hexdigest()
+        name: hashlib.sha256(_template_bytes(name)).hexdigest()
         for name in (TRIAGE_TEMPLATE, RANK_TEMPLATE)
     }
 
@@ -98,7 +102,8 @@ def _code_block(file: FileFacts) -> str:
         lines += ["Recent commits:", *(f"{c.date} {c.subject}" for c in file.recent_commits)]
     lines += ["Code:", file.head]
     if file.truncated_lines:
-        lines += ["Outline of the rest:", *_outline_lines(file.outline)]
+        outline = _outline_lines(file.outline)
+        lines += ["Outline of the rest:", *outline] if outline else []
         lines.append(f"[truncated {file.truncated_lines} lines]")
     return "\n".join(lines)
 

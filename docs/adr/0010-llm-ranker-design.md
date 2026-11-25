@@ -89,4 +89,4 @@ With thinking at `medium` a ranking costs about $0.10 more, and at `high` about 
 
 ## Amendments
 
-- 2026-11-25: [ADR 0022](0022-prompt-templates-and-digest-budget.md) fixes where the prompt templates live and defines the digest overflow budget.
+- 2026-11-25: [ADR 0022](0022-prompt-templates-and-digest-budget.md) fixes where the prompt templates live, defines the digest overflow budget, and adds the digest and truncation parameters to the Manifest's `prompt_hashes` as strings.

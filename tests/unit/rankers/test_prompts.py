@@ -1,3 +1,7 @@
+import hashlib
+from dataclasses import replace
+from importlib import resources
+
 import pytest
 
 from tech_debt_miner.rankers.prompts import (
@@ -6,6 +10,7 @@ from tech_debt_miner.rankers.prompts import (
     build_digest,
     build_rank_prompt,
     build_triage_prompt,
+    estimate_tokens,
     template_hashes,
     triage_set_size,
 )
@@ -28,7 +33,7 @@ def facts(path: str, *, loc: int = 10, **overrides: object) -> FileFacts:
         truncated_lines=0,
         recent_commits=SUBJECTS[:DIGEST_MAX_SUBJECTS],
     )
-    return FileFacts(**{**base.__dict__, **overrides})  # pyright: ignore[reportArgumentType]
+    return replace(base, **overrides)
 
 
 def snapshot_of(*files: FileFacts) -> Snapshot:
@@ -52,25 +57,25 @@ def _without_subjects(files: list[FileFacts]) -> str:
 def test_the_digest_shrinks_subjects_before_names_then_names_before_giving_up() -> None:
     files = [facts(f"pkg/module_{n:03}.py") for n in range(40)]
     full = build_digest(files)
-    full_tokens = len(full) // 3
+    full_tokens = estimate_tokens(full)
 
     fewer = build_digest(files, max_tokens=full_tokens - 1)
     assert len(fewer.splitlines()) < len(full.splitlines())
     assert ": Foo" in fewer
     assert all(f"pkg/module_{n:03}.py" in fewer for n in range(40))  # never drops a file
 
-    no_subjects = build_digest(files, max_tokens=-(-len(_without_subjects(files)) // 3))
+    no_subjects = build_digest(files, max_tokens=estimate_tokens(_without_subjects(files)))
     assert no_subjects == _without_subjects(files)
 
     paths_only = "\n".join(f"{f.path} ({f.loc} lines)" for f in files)
-    bare = build_digest(files, max_tokens=-(-len(paths_only) // 3))
+    bare = build_digest(files, max_tokens=estimate_tokens(paths_only))
     assert bare == paths_only
 
 
 def test_the_shrink_is_uniform_across_files() -> None:
     files = [facts(f"m{n:02}.py") for n in range(30)]
     full = build_digest(files)
-    shrunk = build_digest(files, max_tokens=len(full) // 3 - 1)
+    shrunk = build_digest(files, max_tokens=estimate_tokens(full) - 1)
     counts = {
         sum(1 for line in block if line.startswith("  "))
         for block in (shrunk.split("\nm")[i].splitlines() for i in range(len(files)))
@@ -152,3 +157,15 @@ def test_template_hashes_are_stable_sha256_hex() -> None:
     assert set(hashes) == {"triage", "rank"}
     assert all(len(value) == 64 for value in hashes.values())
     assert hashes == template_hashes()
+
+
+def test_a_cut_file_with_nothing_to_outline_has_no_empty_outline_header() -> None:
+    cut = facts("a.py", truncated_lines=9, outline=())
+    prompt = build_rank_prompt(snapshot_of(cut), ["a.py"])
+    assert "Outline" not in prompt
+    assert "[truncated 9 lines]" in prompt
+
+
+def test_template_hashes_are_the_sha256_of_the_file_bytes() -> None:
+    path = resources.files("tech_debt_miner") / "prompts" / "rank.txt"
+    assert template_hashes()["rank"] == hashlib.sha256(path.read_bytes()).hexdigest()
