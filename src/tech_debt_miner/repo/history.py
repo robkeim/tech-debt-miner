@@ -28,6 +28,11 @@ class CommitChange:
     author_email: str = ""
     message: str = ""
 
+    @property
+    def subject(self) -> str:
+        """The first line of the message."""
+        return self.message.partition("\n")[0]
+
 
 @dataclass(frozen=True)
 class LogEntry:

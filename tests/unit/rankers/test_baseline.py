@@ -12,7 +12,19 @@ pytestmark = pytest.mark.unit
 
 
 def snapshot_of(*rows: tuple[str, int, float]) -> Snapshot:
-    files = tuple(FileFacts(path, loc=10, churn=churn, complexity=cx) for path, churn, cx in rows)
+    files = tuple(
+        FileFacts(
+            path,
+            loc=10,
+            churn=churn,
+            complexity=cx,
+            outline=(),
+            head="",
+            truncated_lines=0,
+            recent_commits=(),
+        )
+        for path, churn, cx in rows
+    )
     return Snapshot(files=files, issues=(), zero_complexity_files=0)
 
 
