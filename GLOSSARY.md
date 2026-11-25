@@ -75,8 +75,12 @@ _Avoid_: Completion, message (that is the SDK's type)
 The `snapshot.json` artifact: each Eligible file's lines of code, Churn and complexity as of the Cutoff date, plus the count of files whose complexity is 0 because they have no functions or `lizard` could not analyze them. Churn counts only commits that are ancestors of the Pinned SHA, so it covers exactly the tree the complexity comes from. Each file also carries what the LLM prompts show ([ADR 0010](docs/adr/0010-llm-ranker-design.md)), so `rank` needs only the Snapshot: an outline of its classes, functions and methods with line numbers (top-level names are the depth-0 entries), its first 150 lines with the count of lines cut, and up to 5 recent commit subjects dated `YYYY-MM-DD`. The outline is empty when the file does not parse.
 _Avoid_: Facts, features
 
+**Ranking**:
+One ranker's output for one repeat: its ranker id, repeat index and an ordered tuple of Tie groups ([ADR 0019](docs/adr/0019-rankings-hold-tie-groups.md)). Not the scores.
+_Avoid_: Result, ordering
+
 **Tie group**:
-Files a ranker ranks equally. Scoring averages every metric over all orderings of each tie group, never by path name ([ADR 0005](docs/adr/0005-scoring-pre-registration.md)).
+Files a ranker ranks equally. Scoring averages every metric over all orderings of each tie group, never by path name ([ADR 0005](docs/adr/0005-scoring-pre-registration.md)). A Ranking is an ordered list of tie groups, most risky first; an LLM ranking is all singleton groups ([ADR 0019](docs/adr/0019-rankings-hold-tie-groups.md)).
 _Avoid_: Bucket, tied set
 
 **Effort map**:

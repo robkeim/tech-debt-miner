@@ -3,6 +3,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+BASELINE = "baseline"  # the Baseline ranker's id and the name of its ranking file
+
 
 @dataclass(frozen=True)
 class Manifest:
@@ -87,7 +89,15 @@ class Request:
 class Ranking:
     ranker: str  # "baseline" or "llm"
     repeat: int  # 0-based; always 0 for the baseline
-    paths: tuple[str, ...]  # most risky first
+    # Tie groups, most risky group first. Files in one group are tied with each other; an LLM
+    # ranking is all singleton groups. Members are stored sorted by path only so the artifact
+    # bytes are deterministic: that order carries no meaning and is not a tie-break (ADR 0019).
+    groups: tuple[tuple[str, ...], ...]
+
+
+def singleton_groups(paths: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
+    """Return a strict order as tie groups of one file each."""
+    return tuple((path,) for path in paths)
 
 
 @dataclass(frozen=True)

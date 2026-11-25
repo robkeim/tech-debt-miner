@@ -12,6 +12,7 @@ from typing import Any
 
 from tech_debt_miner.run import store
 from tech_debt_miner.types import (
+    BASELINE,
     Labels,
     LoggedResponse,
     Manifest,
@@ -20,8 +21,6 @@ from tech_debt_miner.types import (
     Scores,
     Snapshot,
 )
-
-BASELINE = "baseline"
 
 
 class Policy(StrEnum):
