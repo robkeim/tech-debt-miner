@@ -1,17 +1,21 @@
 """The `score` stage: every ADR 0005 metric for each ranking of one Run (ADR 0008)."""
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from tech_debt_miner import scoring
-from tech_debt_miner.run.artifacts import LABELS, RANKING, SCORES, SNAPSHOT, ranking_name
+from tech_debt_miner.run.artifacts import (
+    LABELS,
+    LABELS_12M,
+    RANKING,
+    SCORES,
+    SNAPSHOT,
+    ranking_name,
+)
+from tech_debt_miner.run.label import LabelMissingError
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import RunScores
-
-
-class LabelMissingError(RuntimeError):
-    """`label` has not run, so there is nothing to score against."""
 
 
 class NoRankingsError(RuntimeError):
@@ -47,6 +51,9 @@ def score(run_dir: RunDir, deps: ScoreDeps) -> RunScores:
         raise NoRankingsError(msg)
 
     labels = run_dir.read(LABELS)
+    if run_dir.exists(LABELS_12M):  # written later by `label-later`, never into labels.json
+        late = run_dir.read(LABELS_12M)
+        labels = replace(labels, variants={**labels.variants, "window-12m": late.counts})
     labeled_files = sum(1 for count in labels.counts.values() if count >= 1)
     excluded = (
         f"{labeled_files} files with a Label of 1 or more, "

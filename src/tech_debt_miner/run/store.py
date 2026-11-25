@@ -22,6 +22,7 @@ from tech_debt_miner.types import (
     FileFacts,
     Issue,
     Labels,
+    LateLabels,
     LoggedResponse,
     Manifest,
     OutlineEntry,
@@ -155,6 +156,17 @@ def labels_from_json(data: Mapping[str, Any]) -> Labels:
         linked_closed_bugs=tuple(data.get("linked_closed_bugs", ())),
         issues_read_at=data.get("issues_read_at", ""),
         variants={name: dict(counts) for name, counts in data.get("variants", {}).items()},
+    )
+
+
+def late_labels_from_json(data: Mapping[str, Any]) -> LateLabels:
+    return LateLabels(
+        counts=dict(data["counts"]),
+        max_files=data["max_files"],
+        issues_read_at=data["issues_read_at"],
+        clone_head=data["clone_head"],
+        clone_newest_commit=data["clone_newest_commit"],
+        fetched=data["fetched"],
     )
 
 

@@ -1,4 +1,4 @@
-"""The command line: the five stages, `validate`, `probe`, `report`, `resume` and `status`.
+"""The command line: the five stages, `label-later`, `validate`, `probe`, `report` and more.
 
 `status` prints a Run's state. See ADR 0009.
 """
@@ -30,15 +30,17 @@ from tech_debt_miner.run.label import (
     CapMismatchError,
     CloneUpdateError,
     LabelDeps,
+    LabelMissingError,
     WindowOpenError,
     label,
+    label_later,
 )
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.report import load_runs
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, Stage
-from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
+from tech_debt_miner.run.score import NoRankingsError, ScoreDeps, score
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 from tech_debt_miner.run.stages import StageDeps, resume
 from tech_debt_miner.run.store import write_atomic
@@ -102,6 +104,13 @@ def _parser() -> argparse.ArgumentParser:
         "label", help="count Fix commits once the window has closed", parents=[stage_flags]
     )
     label_cmd.add_argument("run_id")
+
+    later_cmd = commands.add_parser(
+        "label-later",
+        help="count the 12-month window into labels-12m.json once it has closed",
+        parents=[stage_flags],
+    )
+    later_cmd.add_argument("run_id")
 
     _add_report(commands.add_parser)
 
@@ -238,6 +247,23 @@ def _label(args: argparse.Namespace, run_dir: RunDir) -> int:
     return 0
 
 
+def _label_later(args: argparse.Namespace, run_dir: RunDir) -> int:
+    try:
+        deps = _stage_deps(args)
+        label_later(run_dir, deps.label, deps.closed_bugs)
+    except (
+        LabelMissingError,
+        WindowOpenError,
+        CloneUpdateError,
+        CapMismatchError,
+        FileExistsError,
+        github.GitHubError,
+    ) as error:
+        print(error, file=sys.stderr)
+        return 1
+    return 0
+
+
 def _validate(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
         result = validate(run_dir, _stage_deps(args).label)
@@ -321,6 +347,7 @@ _COMMANDS: dict[str, Handler] = {
     "snapshot": _with_run(_snapshot),
     "rank": _with_run(_rank),
     "label": _with_run(_label),
+    "label-later": _with_run(_label_later),
     "validate": _with_run(_validate),
     "score": _with_run(_score),
     "report": _report,
