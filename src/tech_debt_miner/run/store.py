@@ -145,10 +145,13 @@ def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
 def labels_from_json(data: Mapping[str, Any]) -> Labels:
     return Labels(
         counts=dict(data["counts"]),
+        keyword_counts=dict(data.get("keyword_counts", {})),
         stats=dict(data.get("stats", {})),
         clone_head=data.get("clone_head", ""),
         clone_newest_commit=data.get("clone_newest_commit", ""),
         fetched=data.get("fetched", False),
+        linked_closed_bugs=tuple(data.get("linked_closed_bugs", ())),
+        issues_read_at=data.get("issues_read_at", ""),
     )
 
 

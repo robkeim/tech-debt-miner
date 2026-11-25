@@ -23,6 +23,11 @@ from tech_debt_miner.types import Manifest
 
 LLM = "llm"
 
+# The heuristic-only loop (M1): nothing writes `requests.jsonl` or LLM rankings yet, so a Run is
+# planned once `snapshot.json` exists and `rank` is done with the Baseline ranking alone. The
+# LLM rank stage (#88) sets this to True, which restores the full ADR 0008 rules.
+LLM_RANKING = False
+
 
 class Stage(StrEnum):
     RESOLVE = "resolve"
@@ -142,25 +147,29 @@ class RunDir:
 
     def state(self) -> RunState:
         """Derive the Run's state from its artifacts. There is no marker file."""
-        if not (self._is_done(Stage.SNAPSHOT) and self.exists(REQUESTS)):
+        if not self._is_planned():
             return RunState.RESOLVED
-        if not self._is_done(Stage.RANK):
+        if not self.is_done(Stage.RANK):
             return RunState.PLANNED
-        if self._is_done(Stage.LABEL) and self._is_done(Stage.SCORE):
+        if self.is_done(Stage.LABEL) and self.is_done(Stage.SCORE):
             return RunState.SCORED
         return RunState.RANKED
 
     def next_stage(self) -> Stage | None:
         """Return the first stage that is not done, or None when all are (ADR 0008)."""
-        return next((stage for stage in Stage if not self._is_done(stage)), None)
+        return next((stage for stage in Stage if not self.is_done(stage)), None)
 
     def missing_rankings(self) -> list[tuple[str, int]]:
         """Return the (ranker, repeat) pairs `rank` still has to produce."""
         repeats = self.read(MANIFEST).repeats
-        wanted = [(BASELINE, 0), *((LLM, repeat) for repeat in range(repeats))]
+        llm = [(LLM, repeat) for repeat in range(repeats)] if LLM_RANKING else []
+        wanted = [(BASELINE, 0), *llm]
         return [pair for pair in wanted if not self.exists(RANKING, pair)]
 
-    def _is_done(self, stage: Stage) -> bool:
+    def _is_planned(self) -> bool:
+        return self.is_done(Stage.SNAPSHOT) and (not LLM_RANKING or self.exists(REQUESTS))
+
+    def is_done(self, stage: Stage) -> bool:
         """Return whether the stage's final artifact exists."""
         match stage:
             case Stage.RESOLVE:

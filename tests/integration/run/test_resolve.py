@@ -38,7 +38,13 @@ def tool_root(tmp_path: Path) -> Path:
         tmp_path / "tool",
         [
             Commit(
-                "adr 5", {ADR_FILES["0005"]: "five\n", ADR_FILES["0007"]: "seven\n"}, at(2023, 1, 1)
+                "adr 5",
+                {
+                    ADR_FILES["0005"]: "five\n",
+                    ADR_FILES["0007"]: "seven\n",
+                    ADR_FILES["0012"]: "twelve\n",
+                },
+                at(2023, 1, 1),
             ),
             Commit("edit adr 5", {ADR_FILES["0005"]: "five!\n"}, at(2023, 2, 1)),
         ],
@@ -82,7 +88,7 @@ def test_resolve_writes_the_manifest_and_creates_the_run_dir(
     assert manifest.prompt_hashes == {}
     assert manifest.lizard_version == "1.17.0"
     assert manifest.tool_sha == head_sha(tool_root)
-    assert set(manifest.adr_shas) == {"0005", "0007"}
+    assert set(manifest.adr_shas) == {"0005", "0007", "0012"}
 
 
 @pytest.mark.usefixtures("repos_dir")

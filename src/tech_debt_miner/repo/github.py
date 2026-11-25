@@ -38,6 +38,19 @@ query($owner: String!, $name: String!, $after: String, $pageSize: Int!) {
 }
 """
 
+BUGS_QUERY = """
+query($owner: String!, $name: String!, $after: String, $pageSize: Int!) {
+  repository(owner: $owner, name: $name) {
+    issues(first: $pageSize, after: $after, states: [CLOSED]) {
+      pageInfo { hasNextPage endCursor }
+      nodes { number issueType { name } }
+    }
+  }
+}
+"""
+
+BUG_TYPE = "bug"  # the issue type's name, compared ignoring case
+
 # Runs a GraphQL query with variables and returns the decoded response.
 GraphQL = Callable[[str, Mapping[str, str | int | None]], Mapping[str, Any]]
 
@@ -87,6 +100,31 @@ def fetch_issues(
         if len(before) < len(parsed) or not page["pageInfo"]["hasNextPage"]:
             # The page held an issue created on or after the Cutoff date, or was the last one.
             return issues
+        after = page["pageInfo"]["endCursor"]
+
+
+def fetch_closed_bugs(
+    repo: str, graphql: GraphQL = gh_graphql, page_size: int = PAGE_SIZE
+) -> frozenset[int]:
+    """Return the numbers of every issue of `owner/name` that is closed and typed Bug today.
+
+    This reads the tracker's current state, not its state at the Cutoff date: issue state is
+    read at scoring time (ADR 0006). Pull requests are not issues in this API.
+    """
+    owner, name = repo.split("/", 1)
+    bugs: set[int] = set()
+    after: str | None = None
+    while True:
+        response = graphql(
+            BUGS_QUERY, {"owner": owner, "name": name, "after": after, "pageSize": page_size}
+        )
+        page = _page(response)
+        for node in page["nodes"]:
+            issue_type = node["issueType"]
+            if issue_type is not None and issue_type["name"].casefold() == BUG_TYPE:
+                bugs.add(node["number"])
+        if not page["pageInfo"]["hasNextPage"]:
+            return frozenset(bugs)
         after = page["pageInfo"]["endCursor"]
 
 
