@@ -78,6 +78,7 @@ def test_report_command_fails_on_duplicate_windows(
 ) -> None:
     runs = tmp_path / "runs"
     make(runs, "o/a")
-    RunDir.create(runs, manifest("o/a"), lambda: datetime(2027, 1, 2, tzinfo=UTC))
+    again = RunDir.create(runs, manifest("o/a"), lambda: datetime(2027, 1, 2, tzinfo=UTC))
+    again.write(SCORES, scored(0.5), "2027-02-01")
     assert cli.main(["report", "--runs-dir", str(runs)]) == 1
     assert "both cover o/a" in capsys.readouterr().err

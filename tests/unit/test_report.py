@@ -223,3 +223,10 @@ def test_every_headline_repo_is_shown_with_its_own_difference() -> None:
     text = render(build_report(gain_runs(2, 0.1)))
     assert "| o/r0 | 1 | +0.1000 | +0.0000 |" in text
     assert "| o/r1 | 1 | +0.1000 | +0.0000 |" in text
+
+
+def test_a_duplicate_without_scores_is_left_out_not_fatal() -> None:
+    bare = RunScorings("r2", "o/a", "2026-07-01", post_training=True, scorings={})
+    result = build_report([run("o/a", run_scores(llm=((0.6, 0.5),)), run_id="r1"), bare])
+    assert [r.repo for r in result.primary.repos] == ["o/a"]
+    assert [s.run_id for s in result.primary.left_out] == ["r2"]

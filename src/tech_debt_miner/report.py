@@ -196,6 +196,8 @@ def _window(
 def _check_unique(runs: Sequence[RunScorings]) -> None:
     seen: dict[tuple[str, str], str] = {}
     for run in runs:
+        if not run.scorings:
+            continue  # a Run without scores adds nothing to double count; it is listed as left out
         key = (run.repo, run.cutoff_date)
         if key in seen:
             msg = (

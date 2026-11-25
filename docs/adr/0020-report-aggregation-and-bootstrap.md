@@ -10,7 +10,7 @@ Accepted 2026-11-25. Decided in #80. Specifies the aggregation and uncertainty r
 - **Bootstrap.** Percentile CI over the per-repo nDCG@20 differences: 10,000 resamples with replacement, seed 20270131, 95%. The same score files always give the same CI.
 - **Outcome.** The recall@20%-LOC difference is the mean over the same repos. Rules apply in ADR 0005's order, with the margin check inclusive at ±0.05. Below 5 scoreable repos the report prints the CI and no outcome.
 - **Left out, never dropped.** Runs excluded by the minimum-data rule, Runs with no eligible scoring and Runs missing a ranking are listed with the reason.
-- **Duplicates fail.** Two Runs for one repo and Cutoff date make `report` stop, since averaging them would double count a window.
+- **Duplicates fail.** Two scored Runs for one repo and Cutoff date make `report` stop, since averaging them would double count a window. A Run with no scores is listed as left out instead.
 
 ## Why
 
