@@ -7,7 +7,7 @@ from tech_debt_miner import cli
 from tech_debt_miner.run.artifacts import RANKING, REQUESTS, SNAPSHOT
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.run_dir import RunDir, RunState
-from tech_debt_miner.types import FileFacts, Manifest, Ranking, Snapshot
+from tech_debt_miner.types import FileFacts, Manifest, Ranking, Request, Snapshot
 
 pytestmark = pytest.mark.unit
 
@@ -82,6 +82,8 @@ def test_rank_writes_only_the_baseline_ranking(tmp_path: Path) -> None:
 def test_rank_leaves_the_run_ranked_until_llm_rankings_exist(tmp_path: Path) -> None:
     run_dir = new_run(tmp_path)
     run_dir.write(SNAPSHOT, SNAPSHOT_VALUE)
+    for repeat in range(2):
+        run_dir.append(REQUESTS, Request("llm", repeat, 0, "model-1", "s", "p", 10))
 
     rank(run_dir)
 

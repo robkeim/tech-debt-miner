@@ -20,12 +20,14 @@ from tech_debt_miner.llm.client import (
     DryRunTransport,
     LLMClient,
     LLMError,
+    UnknownModelError,
     load_api_key,
 )
+from tech_debt_miner.rankers.prompts import DigestOverflowError
 from tech_debt_miner.repo import git, github
 from tech_debt_miner.report import DuplicateWindowError, build_report
 from tech_debt_miner.report import render as render_report
-from tech_debt_miner.run.artifacts import MANIFEST, RESPONSES, SNAPSHOT
+from tech_debt_miner.run.artifacts import ESTIMATE, MANIFEST, RESPONSES, SNAPSHOT
 from tech_debt_miner.run.cost import open_client
 from tech_debt_miner.run.label import (
     CapMismatchError,
@@ -36,6 +38,8 @@ from tech_debt_miner.run.label import (
     label,
     label_later,
 )
+from tech_debt_miner.run.plan import EstimateExceedsCapError, PlanDeps
+from tech_debt_miner.run.plan import render as render_estimate
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.report import load_runs
@@ -149,6 +153,7 @@ def _parser() -> argparse.ArgumentParser:
         parents=[stage_flags],
     )
     resume_cmd.add_argument("run_id")
+    resume_cmd.add_argument("--max-usd", type=float, default=DEFAULT_MAX_USD)
     resume_cmd.add_argument(
         "--run", action="store_true", help="continue past planning; default stops at a Dry-run"
     )
@@ -183,13 +188,14 @@ def _now() -> datetime:
     return datetime.now(UTC)
 
 
-def _stage_deps(args: argparse.Namespace) -> StageDeps:
+def _stage_deps(args: argparse.Namespace, max_usd: float = DEFAULT_MAX_USD) -> StageDeps:
     """Build the deps for every stage from the arguments; the CLI is their composition root."""
     return StageDeps(
         snapshot=SnapshotDeps(
             repos_dir=args.repos_dir,
             issues=None if args.no_issues else github.fetch_issues,
         ),
+        plan=PlanDeps(max_usd=max_usd),
         label=LabelDeps(
             repos_dir=args.repos_dir,
             clock=_now,
@@ -324,15 +330,31 @@ def _probe(args: argparse.Namespace, run_dir: RunDir) -> int:
 
 def _resume(args: argparse.Namespace, run_dir: RunDir) -> int:
     try:
-        ran = resume(run_dir, _stage_deps(args), run=args.run)
+        ran = resume(run_dir, _stage_deps(args, args.max_usd), run=args.run)
     except github.GitHubError as error:
         # Only `snapshot` can be told to skip GitHub; a failure after it has no such flag.
         hint = "" if run_dir.is_done(Stage.SNAPSHOT) else " (pass --no-issues to skip issues)"
         print(f"{error}{hint}", file=sys.stderr)
         return 1
-    except (WindowOpenError, CloneUpdateError, CapMismatchError, FileExistsError) as error:
+    except DigestOverflowError as error:
+        manifest = run_dir.read(MANIFEST)
+        print(f"excluded: {manifest.target_repo}: {error}", file=sys.stderr)
+        return 1
+    except EstimateExceedsCapError as error:
+        print(render_estimate(run_dir.read(ESTIMATE), args.max_usd), end="")
         print(error, file=sys.stderr)
         return 1
+    except (
+        WindowOpenError,
+        CloneUpdateError,
+        CapMismatchError,
+        FileExistsError,
+        UnknownModelError,
+    ) as error:
+        print(error, file=sys.stderr)
+        return 1
+    if Stage.PLAN in ran:
+        print(render_estimate(run_dir.read(ESTIMATE), args.max_usd), end="")
     print(f"ran: {', '.join(ran) or 'nothing'}; state: {run_dir.state().value}")
     return 0
 

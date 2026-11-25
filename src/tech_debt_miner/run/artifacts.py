@@ -15,6 +15,7 @@ from tech_debt_miner.run import store
 from tech_debt_miner.types import (
     BASELINE,
     Cost,
+    Estimate,
     Labels,
     LateLabels,
     LoggedResponse,
@@ -65,6 +66,9 @@ SNAPSHOT = Artifact[Snapshot, None](
 )
 REQUESTS = Artifact[Request, None](
     "requests", _fixed("requests.jsonl"), jsonio.to_json, store.request_from_json, Policy.APPEND
+)
+ESTIMATE = Artifact[Estimate, None](
+    "estimate", _fixed("estimate.json"), jsonio.to_json, store.estimate_from_json, Policy.REPLACE
 )
 RESPONSES = Artifact[LoggedResponse, None](
     "responses",
@@ -148,6 +152,7 @@ ALL: tuple[Artifact[Any, Any], ...] = (
     MANIFEST,
     SNAPSHOT,
     REQUESTS,
+    ESTIMATE,
     RESPONSES,
     COST,
     LABELS,

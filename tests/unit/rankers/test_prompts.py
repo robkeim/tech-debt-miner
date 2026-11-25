@@ -6,11 +6,13 @@ import pytest
 
 from tech_debt_miner.rankers.prompts import (
     DIGEST_MAX_SUBJECTS,
+    TRIAGE_SET_SIZE,
     DigestOverflowError,
     build_digest,
     build_rank_prompt,
     build_triage_prompt,
     estimate_tokens,
+    largest_triage_set,
     template_hashes,
     triage_set_size,
 )
@@ -169,3 +171,14 @@ def test_a_cut_file_with_nothing_to_outline_has_no_empty_outline_header() -> Non
 def test_template_hashes_are_the_sha256_of_the_file_bytes() -> None:
     path = resources.files("tech_debt_miner") / "prompts" / "rank.txt"
     assert template_hashes()["rank"] == hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def test_the_largest_triage_set_picks_the_biggest_stage_2_blocks() -> None:
+    small = [facts(f"s{n:03}.py", head="x") for n in range(TRIAGE_SET_SIZE)]
+    big = facts("big.py", head="y = 2\n" * 100)
+
+    chosen = largest_triage_set(snapshot_of(*small, big))
+
+    assert len(chosen) == TRIAGE_SET_SIZE
+    assert "big.py" in chosen
+    assert largest_triage_set(snapshot_of(big)) == ("big.py",)

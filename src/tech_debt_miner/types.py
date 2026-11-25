@@ -90,6 +90,24 @@ class Request:
 
 
 @dataclass(frozen=True)
+class Estimate:
+    """A Dry-run's `estimate.json`: per-stage tokens and the cost of the whole Run, in USD.
+
+    Input tokens come from a conservative characters-per-token ratio. Output tokens are each
+    stage's `max_tokens`, so the cost is a ceiling that a retry or thinking can still exceed.
+    Stage 2's input is its worst case: the largest Triage set the Snapshot could produce.
+    """
+
+    model: str
+    repeats: int
+    triage_input_tokens: int  # per repeat
+    triage_output_tokens: int
+    rank_input_tokens: int
+    rank_output_tokens: int
+    total_usd: float  # all repeats of both stages
+
+
+@dataclass(frozen=True)
 class Ranking:
     ranker: str  # "baseline" or "llm"
     repeat: int  # 0-based; always 0 for the baseline

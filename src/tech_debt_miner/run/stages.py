@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from tech_debt_miner.run.label import ClosedBugs, LabelDeps, label
+from tech_debt_miner.run.plan import PlanDeps, plan
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.run_dir import RunDir, Stage
 from tech_debt_miner.run.score import ScoreDeps, score
@@ -20,6 +21,7 @@ class StageDeps:
     """Injected collaborators for every stage `resume` can run."""
 
     snapshot: SnapshotDeps
+    plan: PlanDeps
     label: LabelDeps
     closed_bugs: ClosedBugs
     score: ScoreDeps
@@ -28,12 +30,13 @@ class StageDeps:
 # `resolve` is not here: it creates the Run directory, so a Run being resumed already has it.
 STAGES: tuple[tuple[Stage, Callable[[RunDir, StageDeps], object]], ...] = (
     (Stage.SNAPSHOT, lambda run_dir, deps: snapshot(run_dir, deps.snapshot)),
+    (Stage.PLAN, lambda run_dir, deps: plan(run_dir, deps.plan)),
     (Stage.RANK, lambda run_dir, _deps: rank(run_dir)),
     (Stage.LABEL, lambda run_dir, deps: label(run_dir, deps.label, deps.closed_bugs)),
     (Stage.SCORE, lambda run_dir, deps: score(run_dir, deps.score)),
 )
 
-PLAN_STAGES = frozenset({Stage.SNAPSHOT})  # a Dry-run is a planned Run: resolve, snapshot, stop
+PLAN_STAGES = frozenset({Stage.SNAPSHOT, Stage.PLAN})  # a Dry-run: snapshot, plan, stop
 
 
 def resume(run_dir: RunDir, deps: StageDeps, *, run: bool) -> list[Stage]:

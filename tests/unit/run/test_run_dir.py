@@ -25,6 +25,7 @@ from tech_debt_miner.types import (
     CommitSubject,
     Cost,
     CostAttempt,
+    Estimate,
     FileFacts,
     Issue,
     Labels,
@@ -130,6 +131,7 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
         None,
     ),
     "requests": (Request("llm", 0, 0, "m", "s", "p", 10), None),
+    "estimate": (Estimate("m", 3, 100, 4000, 200, 8000, 1.25), None),
     "responses": (
         LoggedResponse(
             "llm", 0, 0, cache_hit=False, response=Response("hi", 1, 2, "end_turn", "req", "m")
@@ -247,22 +249,15 @@ def test_a_fresh_run_is_resolved_and_needs_a_snapshot(tmp_path: Path) -> None:
     assert run.next_stage() is Stage.SNAPSHOT
 
 
-def test_a_snapshot_makes_the_run_planned_in_the_heuristic_loop(tmp_path: Path) -> None:
-    run = make_run(tmp_path)
-    run.write(SNAPSHOT, SNAPSHOT_VALUE)
-    assert run.state() is RunState.PLANNED
-    assert run.next_stage() is Stage.RANK
-
-
-def test_a_snapshot_without_requests_is_resolved_once_llm_ranking_lands(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(run_dir_module, "LLM_RANKING", True)
+def test_a_run_is_planned_once_it_has_a_snapshot_and_requests(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
     assert run.state() is RunState.RESOLVED
+    assert run.next_stage() is Stage.PLAN
     run.append(REQUESTS, REQUEST)
+    run.append(REQUESTS, replace(REQUEST, repeat=1))
     assert run.state() is RunState.PLANNED
+    assert run.next_stage() is Stage.RANK
 
 
 def test_rank_resumes_per_ranking(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -270,6 +265,7 @@ def test_rank_resumes_per_ranking(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
     run.append(REQUESTS, REQUEST)
+    run.append(REQUESTS, replace(REQUEST, repeat=1))
     assert run.missing_rankings() == [("baseline", 0), ("llm", 0), ("llm", 1)]
     run.write(RANKING, Ranking("baseline", 0, ()))
     run.write(RANKING, Ranking("llm", 0, ()))
@@ -283,6 +279,8 @@ def test_rank_resumes_per_ranking(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 def test_a_ranked_run_resumes_at_label_then_score(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
+    run.append(REQUESTS, REQUEST)
+    run.append(REQUESTS, replace(REQUEST, repeat=1))
     run.write(RANKING, Ranking("baseline", 0, ()))
     assert run.state() is RunState.RANKED
     assert run.next_stage() is Stage.LABEL
