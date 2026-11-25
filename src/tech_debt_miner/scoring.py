@@ -9,6 +9,7 @@ import random
 import statistics
 import sys
 from collections.abc import Callable, Collection, Mapping, Sequence
+from dataclasses import replace
 from fractions import Fraction
 
 from tech_debt_miner.types import Labels, Scores
@@ -19,6 +20,7 @@ type _Item = tuple[str, int, int]  # (path, effort, Label)
 PRIMARY_K = 20
 REPORTED_KS = (5, 10, 50)
 LOC_BUDGET = Fraction(1, 5)
+COMPLEXITY_SUFFIX = "cc"  # `recall@20%cc`: recall with cyclomatic complexity as the effort
 MIN_LABELED_FILES = 10  # minimum data: files with a Label of 1 or more (ADR 0005)
 
 _EXACT_GROUP_LIMIT = 10  # largest tie group enumerated exactly (ADR 0018)
@@ -291,13 +293,17 @@ def _sampled_found(items: Sequence[Sequence[_Item]], budget: int) -> float:
 
 
 def score_ranking(
-    groups: Sequence[Collection[str]], labels: Labels, loc: Mapping[str, int]
+    groups: Sequence[Collection[str]],
+    labels: Labels,
+    loc: Mapping[str, int],
+    complexity: Mapping[str, int] | None = None,
 ) -> Scores:
     """Every metric ADR 0005 names for one ranking, keyed by metric name.
 
     The primary nDCG@20 and the co-primary recall come first; the rest are reported only. The
     `spearman` key is present only for a full ordering. Cyclomatic-complexity recall needs a
-    second effort map, so callers get it from `recall_at_budget` directly.
+    second effort map, so it is scored only when `complexity` is given. Each Label variant
+    (keyword-only, window and cap) adds an `ndcg@20[<name>]` key, scored against that count set.
     """
     metrics: dict[str, float] = {
         f"ndcg@{PRIMARY_K}": ndcg_at_k(groups, labels, PRIMARY_K),
@@ -309,6 +315,13 @@ def score_ranking(
         metrics[f"ndcg@{k}"] = ndcg_at_k(groups, labels, k)
     metrics[f"ndcg@{PRIMARY_K}:binary"] = ndcg_at_k(groups, labels, PRIMARY_K, binary_gain)
     metrics[f"ndcg@{PRIMARY_K}:raw"] = ndcg_at_k(groups, labels, PRIMARY_K, raw_gain)
+    if complexity is not None:
+        metrics[f"recall@20%{COMPLEXITY_SUFFIX}"] = recall_at_budget(groups, labels, complexity)
+    variants = {"keyword": labels.keyword_counts, **labels.variants}
+    for name, counts in variants.items():
+        metrics[f"ndcg@{PRIMARY_K}[{name}]"] = ndcg_at_k(
+            groups, replace(labels, counts=counts), PRIMARY_K
+        )
     rho = spearman(groups, labels)
     if rho is not None:
         metrics["spearman"] = rho

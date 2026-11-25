@@ -86,6 +86,12 @@ class FakeHTTP:
         return AnthropicTransport(KEY, http_client=http_client, **options)
 
 
+def test_transport_exposes_its_thinking_and_effort_settings() -> None:
+    assert AnthropicTransport(KEY).settings == {"thinking": "off", "effort": "high"}
+    adaptive = AnthropicTransport(KEY, thinking="adaptive", effort="low")
+    assert adaptive.settings == {"thinking": "adaptive", "effort": "low"}
+
+
 def test_client_returns_the_response_and_tracks_spend() -> None:
     client = LLMClient(FakeTransport(response()), max_usd=1.0)
     assert client.complete(request()) == response()

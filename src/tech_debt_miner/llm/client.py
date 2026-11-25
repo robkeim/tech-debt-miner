@@ -137,6 +137,11 @@ class AnthropicTransport:
         self._effort: Literal["low", "medium", "high"] = effort
         self._secrets = (api_key,)
 
+    @property
+    def settings(self) -> dict[str, str]:
+        """Settings that change replies but are not in the `Request`; the cache key adds them."""
+        return {"thinking": self._thinking, "effort": self._effort}
+
     def send(self, request: Request, schema: Mapping[str, object] | None) -> Response:
         # temperature, top_p and top_k are never sent: the model rejects non-default values
         # (ADR 0012).

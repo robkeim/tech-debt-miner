@@ -47,6 +47,7 @@ class LabelWindow:
     clone: Path
     commits: list[CommitChange]
     cutoff_files: list[str]  # every path in the tree at the Pinned SHA
+    later_commits: list[CommitChange]  # after the 6-month window, up to 12 months; empty if open
 
 
 def read_window(run_dir: RunDir, deps: LabelDeps) -> LabelWindow:
@@ -73,7 +74,16 @@ def read_window(run_dir: RunDir, deps: LabelDeps) -> LabelWindow:
     commits = git.list_commits(
         clone, labels.window_start(cutoff), labels.window_end(cutoff) + timedelta(days=1)
     )
-    return LabelWindow(clone, commits, git.list_files(clone, manifest.pinned_sha))
+    later = (
+        git.list_commits(
+            clone,
+            labels.window_end(cutoff) + timedelta(days=1),
+            labels.window_end(cutoff, labels.LONG_WINDOW_MONTHS) + timedelta(days=1),
+        )
+        if labels.window_is_closed(cutoff, today, labels.LONG_WINDOW_MONTHS)
+        else []
+    )
+    return LabelWindow(clone, commits, git.list_files(clone, manifest.pinned_sha), later)
 
 
 def label(run_dir: RunDir, deps: LabelDeps, closed_bugs: ClosedBugs) -> Labels:
@@ -99,8 +109,17 @@ def label(run_dir: RunDir, deps: LabelDeps, closed_bugs: ClosedBugs) -> Labels:
     read_at = deps.clock()
     result = labels.build_labels(window.commits, window.cutoff_files, deps.max_files, bugs)
     linked = {n for commit in window.commits for n in labels.linked_issues(commit)}
+    variants = labels.build_variants(
+        window.commits,
+        window.later_commits,
+        window.cutoff_files,
+        max_files=deps.max_files,
+        closed_bugs=bugs,
+        cutoff=date.fromisoformat(run_dir.read(MANIFEST).cutoff_date),
+    )
     result = replace(
         result,
+        variants=variants,
         linked_closed_bugs=tuple(sorted(linked & bugs)),
         issues_read_at=read_at.isoformat(),
         clone_head=git.head_sha(window.clone),
