@@ -23,6 +23,8 @@ from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, RunState, Stag
 from tech_debt_miner.types import (
     CapResult,
     CommitSubject,
+    Cost,
+    CostAttempt,
     FileFacts,
     Issue,
     Labels,
@@ -133,7 +135,7 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
         ),
         None,
     ),
-    "cost": ({"usd": 1.5}, None),
+    "cost": (Cost((CostAttempt(4.0, 1.5), CostAttempt(6.0, 0.5))), None),
     "labels": (Labels({"a.py": 1}), None),
     "validation": (
         Validation(
