@@ -1,6 +1,6 @@
-"""The command line: the five stages, `validate`, `probe` and `status`.
+"""The command line: the five stages, `validate`, `probe`, `resume` and `status`.
 
-See ADR 0009.
+`status` prints a Run's state. See ADR 0009.
 """
 
 import argparse
@@ -33,9 +33,10 @@ from tech_debt_miner.run.label import (
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
-from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
+from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError, Stage
 from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
+from tech_debt_miner.run.stages import StageDeps, resume
 from tech_debt_miner.run.validate import render, validate
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
@@ -104,6 +105,19 @@ def _parser() -> argparse.ArgumentParser:
     rank_cmd.add_argument("run_id")
     rank_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    resume_cmd = commands.add_parser(
+        "resume", help="run the stages a Run has not finished; skips the done ones"
+    )
+    resume_cmd.add_argument("run_id")
+    resume_cmd.add_argument(
+        "--run", action="store_true", help="continue past planning; default stops at a Dry-run"
+    )
+    resume_cmd.add_argument("--no-issues", action="store_true", help="see `snapshot`")
+    resume_cmd.add_argument("--no-fetch", action="store_true", help="see `label`")
+    resume_cmd.add_argument("--max-files", type=int, default=None, help="see `label`")
+    resume_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    resume_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
     status_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
@@ -120,6 +134,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate": _validate,
         "score": _score,
         "probe": _probe,
+        "resume": _resume,
         "status": _status,
     }
     return handlers[args.command](args)
@@ -144,17 +159,30 @@ def _resolve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _snapshot_deps(args: argparse.Namespace) -> SnapshotDeps:
+    return SnapshotDeps(
+        repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
+    )
+
+
+def _label_deps(args: argparse.Namespace) -> LabelDeps:
+    """Build the label stage deps; `validate` has no `--max-files`, so its cap is None."""
+    return LabelDeps(
+        repos_dir=args.repos_dir,
+        clock=lambda: datetime.now(UTC),
+        update_clone=None if args.no_fetch else git.fast_forward,
+        max_files=getattr(args, "max_files", None),
+    )
+
+
 def _snapshot(args: argparse.Namespace) -> int:
     try:
         run_dir = RunDir.open(args.runs_dir, args.run_id)
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = SnapshotDeps(
-        repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
-    )
     try:
-        snapshot(run_dir, deps)
+        snapshot(run_dir, _snapshot_deps(args))
     except github.GitHubError as error:
         print(f"{error} (pass --no-issues to skip issues)", file=sys.stderr)
         return 1
@@ -180,14 +208,8 @@ def _label(args: argparse.Namespace) -> int:
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = LabelDeps(
-        repos_dir=args.repos_dir,
-        clock=lambda: datetime.now(UTC),
-        update_clone=None if args.no_fetch else git.fast_forward,
-        max_files=args.max_files,
-    )
     try:
-        label(run_dir, deps, github.fetch_closed_bugs)
+        label(run_dir, _label_deps(args), github.fetch_closed_bugs)
     except (WindowOpenError, CloneUpdateError, CapMismatchError, github.GitHubError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -200,13 +222,8 @@ def _validate(args: argparse.Namespace) -> int:
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = LabelDeps(
-        repos_dir=args.repos_dir,
-        clock=lambda: datetime.now(UTC),
-        update_clone=None if args.no_fetch else git.fast_forward,
-    )
     try:
-        result = validate(run_dir, deps)
+        result = validate(run_dir, _label_deps(args))
     except (WindowOpenError, CloneUpdateError, FileExistsError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -256,6 +273,32 @@ def _probe(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 1
     print("hit" if result.hit else "miss")
+    return 0
+
+
+def _resume(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    deps = StageDeps(
+        snapshot=_snapshot_deps(args),
+        label=_label_deps(args),
+        closed_bugs=github.fetch_closed_bugs,
+        score=ScoreDeps(clock=lambda: datetime.now(UTC)),
+    )
+    try:
+        ran = resume(run_dir, deps, run=args.run)
+    except github.GitHubError as error:
+        # Only `snapshot` can be told to skip GitHub; a failure after it has no such flag.
+        hint = "" if run_dir.is_done(Stage.SNAPSHOT) else " (pass --no-issues to skip issues)"
+        print(f"{error}{hint}", file=sys.stderr)
+        return 1
+    except (WindowOpenError, CloneUpdateError, CapMismatchError, FileExistsError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    print(f"ran: {', '.join(ran) or 'nothing'}; state: {run_dir.state().value}")
     return 0
 
 
