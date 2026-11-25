@@ -199,3 +199,26 @@ def test_cli_probe_refuses_a_resume_whose_cap_is_already_spent(
 
     assert "--max-usd" in capsys.readouterr().err
     assert run_dir.read(COST) == Cost((CostAttempt(4.0, 4.0),))
+
+
+def test_cli_probe_run_logs_the_cap_and_spend_in_cost_json(
+    run_dir: RunDir,
+    frozen_clock: time_machine.Traveller,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    frozen_clock.move_to(datetime(2024, 8, 1, tzinfo=UTC))
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-fake")  # cspell:disable-line
+
+    def fake_transport(_key: str) -> FakeTransport:
+        return FakeTransport("{}")
+
+    monkeypatch.setattr(cli, "AnthropicTransport", fake_transport)
+    argv = ["probe", run_dir.id, "--run", "--max-usd", "2.5"]
+    argv += ["--runs-dir", str(run_dir.path.parent)]
+    argv += ["--repos-dir", str(run_dir.path.parents[1] / "repos")]
+
+    assert cli.main(argv) == 0
+
+    [attempt] = run_dir.read(COST).attempts
+    assert attempt.max_usd == 2.5
+    assert attempt.spent_usd == pytest.approx(100 * 2 / 1e6 + 10 * 10 / 1e6)
