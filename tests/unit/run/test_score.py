@@ -148,3 +148,11 @@ def test_cli_score_before_label_fails_and_writes_nothing(
 
 def test_cli_score_unknown_run_fails(tmp_path: Path) -> None:
     assert cli.main(["score", "nope", "--runs-dir", str(tmp_path)]) == 2
+
+
+@pytest.mark.parametrize("name", ["llm.json", "llm-x.json", "my-ranker-1.json", "baseline-1.json"])
+def test_a_stray_ranking_file_fails_loudly(tmp_path: Path, name: str) -> None:
+    run = make_run(tmp_path)
+    (run.path / "rankings" / name).write_text("{}", encoding="utf-8")
+    with pytest.raises(ValueError, match="unexpected ranking file"):
+        run.keys(RANKING)
