@@ -18,6 +18,8 @@ _To be written once the method is settled. Decisions that shape it are recorded 
 
 ```sh
 uv run tdm resolve --repo owner/name --cutoff 2026-07-01   # clones into repos/, prints the Run id
+uv run tdm snapshot <run-id>                                 # writes snapshot.json
+uv run tdm rank <run-id>                                     # writes rankings/baseline.json (tie groups, no LLM yet)
 uv run tdm status <run-id>                                  # resolved, planned, ranked or scored
 uv run tdm label <run-id> [--max-files N] [--no-fetch]                   # writes labels.json once the 6-month window has closed
 uv run tdm probe <run-id> [--run] [--max-usd N]                         # canary probe; Dry-run unless --run

@@ -56,7 +56,9 @@ def make_run(tmp_path: Path, commits: list[Commit]) -> RunDir:
 
 
 def deps_for(run_dir: RunDir, transport: FakeTransport, today: date = AFTER_WINDOW) -> ProbeDeps:
-    client = LLMClient(transport, max_usd=1.0, log=lambda row: run_dir.append(RESPONSES, row))
+    client = LLMClient(
+        transport, max_usd=1.0, on_response=lambda row: run_dir.append(RESPONSES, row)
+    )
     return ProbeDeps(repos_dir=run_dir.path.parents[1] / "repos", client=client, today=today)
 
 
@@ -87,7 +89,7 @@ def test_probe_asks_about_the_earliest_post_cutoff_fix_and_logs_through_the_clie
     assert "fix crash on empty input" in request.prompt
     assert schema is not None
     [row] = run_dir.read_all(RESPONSES)
-    assert (row["ranker"], row["request_id"]) == ("probe", "req_1")
+    assert (row.ranker, row.response.request_id) == ("probe", "req_1")
 
 
 def test_probe_prompt_carries_no_repo_context(run_dir: RunDir) -> None:

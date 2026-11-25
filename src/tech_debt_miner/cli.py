@@ -1,4 +1,4 @@
-"""The command line: `resolve`, `snapshot`, `label`, `probe` and `status` so far (ADR 0009)."""
+"""The command line: `resolve`, `snapshot`, `rank`, `label`, `probe`, `status` (ADR 0009)."""
 
 import argparse
 import os
@@ -19,9 +19,10 @@ from tech_debt_miner.llm.client import (
     load_api_key,
 )
 from tech_debt_miner.repo import git
-from tech_debt_miner.run.artifacts import RESPONSES
+from tech_debt_miner.run.artifacts import RESPONSES, SNAPSHOT
 from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
+from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
@@ -71,6 +72,9 @@ def _parser() -> argparse.ArgumentParser:
     probe_cmd.add_argument("--max-usd", type=float, default=DEFAULT_MAX_USD)
     probe_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     probe_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+    rank_cmd = commands.add_parser("rank", help="write the Baseline ranking for a Run")
+    rank_cmd.add_argument("run_id")
+    rank_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     status_cmd = commands.add_parser("status", help="print a Run's state")
     status_cmd.add_argument("run_id")
@@ -88,6 +92,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         return _snapshot(args)
     if args.command == "probe":
         return _probe(args)
+    if args.command == "rank":
+        return _rank(args)
     return _status(args)
 
 
@@ -117,6 +123,19 @@ def _snapshot(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 2
     snapshot(run_dir, SnapshotDeps(repos_dir=args.repos_dir))
+    return 0
+
+
+def _rank(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    if not run_dir.exists(SNAPSHOT):
+        print(f"run {args.run_id} has no snapshot; run `snapshot` first", file=sys.stderr)
+        return 2
+    rank(run_dir)
     return 0
 
 
@@ -152,7 +171,7 @@ def _probe(args: argparse.Namespace) -> int:
             LLMClient(
                 AnthropicTransport(load_api_key(os.environ, Path(".env"))),
                 max_usd=args.max_usd,
-                log=partial(run_dir.append, RESPONSES),
+                on_response=partial(run_dir.append, RESPONSES),
             )
             if args.run
             else LLMClient(DryRunTransport(), max_usd=args.max_usd)

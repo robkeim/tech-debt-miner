@@ -25,11 +25,11 @@ The past date a Target repo is rewound to; only history before it is visible to 
 _Avoid_: As-of date, rewind date
 
 **Replay**:
-Re-scoring a Run from its logged LLM responses without calling the LLM again.
+Re-scoring a Run from its logged LLM responses (`responses.jsonl`) without calling the LLM again, and without the Response cache or the Target repo.
 _Avoid_: Rerun (a rerun calls the LLM again)
 
 **Response cache**:
-A local store of LLM responses keyed by the exact request, so identical requests are never paid for twice.
+A local store of LLM responses keyed by the exact request, repeat index and attempt index ([ADR 0017](docs/adr/0017-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
@@ -78,3 +78,15 @@ _Avoid_: Facts, features
 **Canary probe**:
 The once-per-Run check that asks the model to name the file changed by one post-Cutoff Fix commit, from its message alone with no repo context, written to `probe.json`. A hit suggests memorization. Reported beside results, never in the verdict ([ADR 0006](docs/adr/0006-target-repos-and-cutoff-dates.md)).
 _Avoid_: Memorization test, contamination check
+
+**Ranking**:
+One ranker's output for one repeat: its ranker id, repeat index and an ordered tuple of Tie groups ([ADR 0019](docs/adr/0019-rankings-hold-tie-groups.md)). Not the scores.
+_Avoid_: Result, ordering
+
+**Tie group**:
+Files a ranker ranks equally. Scoring averages every metric over all orderings of each tie group, never by path name ([ADR 0005](docs/adr/0005-scoring-pre-registration.md)). A Ranking is an ordered list of tie groups, most risky first; an LLM ranking is all singleton groups ([ADR 0019](docs/adr/0019-rankings-hold-tie-groups.md)).
+_Avoid_: Bucket, tied set
+
+**Effort map**:
+The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0018](docs/adr/0018-recall-budget-and-effort-map.md)).
+_Avoid_: LOC map, size map
