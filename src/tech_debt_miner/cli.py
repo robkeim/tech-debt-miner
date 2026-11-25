@@ -152,17 +152,30 @@ def _resolve(args: argparse.Namespace) -> int:
     return 0
 
 
+def _snapshot_deps(args: argparse.Namespace) -> SnapshotDeps:
+    return SnapshotDeps(
+        repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
+    )
+
+
+def _label_deps(args: argparse.Namespace) -> LabelDeps:
+    """Build the label stage deps; `validate` has no `--max-files`, so its cap is None."""
+    return LabelDeps(
+        repos_dir=args.repos_dir,
+        clock=lambda: datetime.now(UTC),
+        update_clone=None if args.no_fetch else git.fast_forward,
+        max_files=getattr(args, "max_files", None),
+    )
+
+
 def _snapshot(args: argparse.Namespace) -> int:
     try:
         run_dir = RunDir.open(args.runs_dir, args.run_id)
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = SnapshotDeps(
-        repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
-    )
     try:
-        snapshot(run_dir, deps)
+        snapshot(run_dir, _snapshot_deps(args))
     except github.GitHubError as error:
         print(f"{error} (pass --no-issues to skip issues)", file=sys.stderr)
         return 1
@@ -188,14 +201,8 @@ def _label(args: argparse.Namespace) -> int:
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = LabelDeps(
-        repos_dir=args.repos_dir,
-        clock=lambda: datetime.now(UTC),
-        update_clone=None if args.no_fetch else git.fast_forward,
-        max_files=args.max_files,
-    )
     try:
-        label(run_dir, deps)
+        label(run_dir, _label_deps(args))
     except (WindowOpenError, CloneUpdateError, CapMismatchError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -208,13 +215,8 @@ def _validate(args: argparse.Namespace) -> int:
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = LabelDeps(
-        repos_dir=args.repos_dir,
-        clock=lambda: datetime.now(UTC),
-        update_clone=None if args.no_fetch else git.fast_forward,
-    )
     try:
-        result = validate(run_dir, deps)
+        result = validate(run_dir, _label_deps(args))
     except (WindowOpenError, CloneUpdateError, FileExistsError) as error:
         print(error, file=sys.stderr)
         return 1
@@ -257,17 +259,7 @@ def _resume(args: argparse.Namespace) -> int:
     except RunNotFoundError as error:
         print(error, file=sys.stderr)
         return 2
-    deps = StageDeps(
-        snapshot=SnapshotDeps(
-            repos_dir=args.repos_dir, issues=None if args.no_issues else github.fetch_issues
-        ),
-        label=LabelDeps(
-            repos_dir=args.repos_dir,
-            clock=lambda: datetime.now(UTC),
-            update_clone=None if args.no_fetch else git.fast_forward,
-            max_files=args.max_files,
-        ),
-    )
+    deps = StageDeps(snapshot=_snapshot_deps(args), label=_label_deps(args))
     try:
         ran = resume(run_dir, deps, run=args.run)
     except github.GitHubError as error:
