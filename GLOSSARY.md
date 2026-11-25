@@ -43,8 +43,12 @@ _Avoid_: Cutoff test
 A commit on the Target repo's default branch that is identified as a bug fix by the rule in [ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md).
 _Avoid_: Bug commit, fixing commit
 
+**Tracker-confirmed Fix commit**:
+A Fix commit of the primary set: it links an issue (`#N` or an `/issues/N` URL, never a bare number or a trailing `(#N)` PR number) that is closed and typed Bug when `label` runs ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). The keyword-only set is the sensitivity check.
+_Avoid_: Confirmed bug, linked fix
+
 **Label**:
-The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date, counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
+The per-file ground truth: the number of distinct tracker-confirmed Fix commits touching the file after the Cutoff date (`counts` in `labels.json`; the keyword-only set is `keyword_counts`), counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Fix size**:
@@ -102,3 +106,7 @@ _Avoid_: Bucket, tied set
 **Effort map**:
 The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0018](docs/adr/0018-recall-budget-and-effort-map.md)).
 _Avoid_: LOC map, size map
+
+**Excluded Run**:
+A Run with fewer than 10 files at Label 1 or more. `score` still writes its `scores-<scoring-date>.json`, with the reason and count and no metrics, so `report` counts it instead of dropping it ([ADR 0005](docs/adr/0005-scoring-pre-registration.md), [ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
+_Avoid_: Skipped Run, dropped Run

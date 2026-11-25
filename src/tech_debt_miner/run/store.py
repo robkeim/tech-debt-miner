@@ -28,6 +28,7 @@ from tech_debt_miner.types import (
     Request,
     Response,
     ReviewItem,
+    RunScores,
     Scores,
     Snapshot,
     Validation,
@@ -144,15 +145,26 @@ def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
 def labels_from_json(data: Mapping[str, Any]) -> Labels:
     return Labels(
         counts=dict(data["counts"]),
+        keyword_counts=dict(data.get("keyword_counts", {})),
         stats=dict(data.get("stats", {})),
         clone_head=data.get("clone_head", ""),
         clone_newest_commit=data.get("clone_newest_commit", ""),
         fetched=data.get("fetched", False),
+        linked_closed_bugs=tuple(data.get("linked_closed_bugs", ())),
+        issues_read_at=data.get("issues_read_at", ""),
     )
 
 
-def scores_from_json(data: Mapping[str, Any]) -> Scores:
-    return Scores(metrics=dict(data["metrics"]))
+def scores_from_json(data: Mapping[str, Any]) -> RunScores:
+    return RunScores(
+        labeled_files=data["labeled_files"],
+        min_labeled_files=data["min_labeled_files"],
+        excluded=data["excluded"],
+        rankings={
+            name: Scores(metrics=dict(scores["metrics"]))
+            for name, scores in data["rankings"].items()
+        },
+    )
 
 
 def validation_from_json(data: Mapping[str, Any]) -> Validation:

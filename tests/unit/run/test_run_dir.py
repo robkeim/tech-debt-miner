@@ -34,6 +34,7 @@ from tech_debt_miner.types import (
     Request,
     Response,
     ReviewItem,
+    RunScores,
     Scores,
     Snapshot,
     Validation,
@@ -148,7 +149,7 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
     ),
     "probe": (Probe("c" * 40, "a.py", "b.py", hit=False), None),
     "ranking": (Ranking("llm", 1, (("a.py",),)), ("llm", 1)),
-    "scores": (Scores({"m": 0.1}), "2027-01-31"),
+    "scores": (RunScores(1, 10, "", {"baseline": Scores({"m": 0.1})}), "2027-01-31"),
 }
 
 
@@ -203,7 +204,7 @@ def test_policy_mismatches_are_rejected(tmp_path: Path) -> None:
 def test_a_keyed_artifact_needs_its_key(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     with pytest.raises(TypeError, match="scores needs a key"):
-        run.write(SCORES, Scores({}))
+        run.write(SCORES, RunScores(0, 10, "x", {}))
     with pytest.raises(TypeError, match="scores needs a key"):
         run.read(SCORES)
     assert not list(run.path.glob("scores-*"))
@@ -211,8 +212,8 @@ def test_a_keyed_artifact_needs_its_key(tmp_path: Path) -> None:
 
 def test_scores_are_listed_by_date(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    run.write(SCORES, Scores({"m": 0.1}), "2027-03-01")
-    run.write(SCORES, Scores({"m": 0.1}), "2027-01-31")
+    run.write(SCORES, RunScores(1, 10, "", {"baseline": Scores({"m": 0.1})}), "2027-03-01")
+    run.write(SCORES, RunScores(1, 10, "", {"baseline": Scores({"m": 0.1})}), "2027-01-31")
     assert run.keys(SCORES) == ["2027-01-31", "2027-03-01"]
 
 
@@ -281,6 +282,6 @@ def test_a_ranked_run_resumes_at_label_then_score(tmp_path: Path) -> None:
     run.write(LABELS, Labels({}))
     assert run.state() is RunState.RANKED
     assert run.next_stage() is Stage.SCORE
-    run.write(SCORES, Scores({}), "2027-01-31")
+    run.write(SCORES, RunScores(0, 10, "x", {}), "2027-01-31")
     assert run.state() is RunState.SCORED
     assert run.next_stage() is None

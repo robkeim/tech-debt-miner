@@ -106,7 +106,11 @@ def singleton_groups(paths: tuple[str, ...]) -> tuple[tuple[str, ...], ...]:
 
 @dataclass(frozen=True)
 class Labels:
-    counts: Mapping[str, int]  # Cutoff-date path -> number of Fix commits after the Cutoff date
+    # Cutoff-date path -> number of tracker-confirmed Fix commits after the Cutoff date. This is
+    # the primary Label that `score` reads (ADR 0004).
+    counts: Mapping[str, int]
+    # The same count for the keyword-only sensitivity set; never scored as the headline.
+    keyword_counts: Mapping[str, int] = field(default_factory=dict[str, int])
     stats: Mapping[str, float] = field(
         default_factory=dict[str, float]
     )  # ADR 0004 reporting figures
@@ -115,6 +119,10 @@ class Labels:
     clone_head: str = ""
     clone_newest_commit: str = ""
     fetched: bool = False
+    # The closed bugs the primary set linked, and when the tracker was read (ISO 8601). Issue
+    # state is read at scoring time (ADR 0006), so this records what that read saw.
+    linked_closed_bugs: tuple[int, ...] = ()
+    issues_read_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -154,6 +162,18 @@ class Validation:
 @dataclass(frozen=True)
 class Scores:
     metrics: Mapping[str, float]  # metric name -> value
+
+
+@dataclass(frozen=True)
+class RunScores:
+    """What `scores-<scoring-date>.json` holds: every ranking's Scores for one Run (ADR 0008)."""
+
+    labeled_files: int  # files with a Label of 1 or more
+    min_labeled_files: int  # the minimum-data rule in force (ADR 0005)
+    excluded: str  # why the Run is excluded from aggregation; empty when it is not
+    rankings: Mapping[
+        str, Scores
+    ]  # ranking name ("baseline", "llm-0") -> Scores; empty if excluded
 
 
 @dataclass(frozen=True)

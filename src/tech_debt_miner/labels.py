@@ -1,7 +1,8 @@
 """The Label: per-file counts of Fix commits after the Cutoff date (ADR 0004).
 
-Only the keyword-only set exists so far. Everything here is pure: it takes commits already read
-from the Target repo and never touches it.
+Two sets are counted side by side: the primary, tracker-confirmed set and the keyword-only
+sensitivity set. Everything here is pure: it takes commits already read from the Target repo, and
+the numbers of the issues the tracker reports as closed bugs, and never touches either.
 """
 
 import calendar
@@ -50,6 +51,11 @@ def is_bot(commit: CommitChange) -> bool:
     )
 
 
+def _passes_exclusions(commit: CommitChange) -> bool:
+    """Return whether the exclusions both label sets share hold: no bot, no excluded word."""
+    return not is_bot(commit) and _EXCLUDED_MESSAGE.search(commit.message) is None
+
+
 def is_keyword_fix(commit: CommitChange) -> bool:
     """Return whether the keyword-only rule with its exclusions holds, before the fix-size cap.
 
@@ -57,11 +63,7 @@ def is_keyword_fix(commit: CommitChange) -> bool:
     (subject and body). The keywords match whole words; the exclusions match as substrings, so
     "refactoring" and "renamed" are excluded too.
     """
-    return (
-        not is_bot(commit)
-        and _KEYWORD.search(commit.message) is not None
-        and _EXCLUDED_MESSAGE.search(commit.message) is None
-    )
+    return _passes_exclusions(commit) and _KEYWORD.search(commit.message) is not None
 
 
 def is_squash_merge(commit: CommitChange) -> bool:
@@ -76,6 +78,26 @@ def carries_only_pr_number(commit: CommitChange) -> bool:
     if match is None:
         return False
     return _ISSUE_REFERENCE.search(subject[: match.start()] + "\n" + body) is None
+
+
+def linked_issues(commit: CommitChange) -> tuple[int, ...]:
+    """Return the issue numbers the message links, in order of first mention.
+
+    Only `#N` and `/issues/N` references count. A bare number never does, and neither does a
+    trailing `(#N)`, which is a PR number (ADR 0004).
+    """
+    return tuple(int(re.sub(r"\D", "", ref)) for ref in issue_references(commit))
+
+
+def is_tracker_fix(commit: CommitChange, closed_bugs: Collection[int]) -> bool:
+    """Return whether the tracker-confirmed rule with its exclusions holds, before the cap.
+
+    The commit must link an issue that is a closed bug. The bot and message exclusions are the
+    same as for the keyword set; the keyword itself is not needed.
+    """
+    return _passes_exclusions(commit) and any(
+        number in closed_bugs for number in linked_issues(commit)
+    )
 
 
 def eligible_files(commit: CommitChange) -> tuple[str, ...]:
@@ -114,7 +136,7 @@ def cap_report(
     results: list[CapResult] = []
     for cap in caps:
         built = build_labels(commits, cutoff_files, cap)
-        counts = list(built.counts.values())
+        counts = list(built.keyword_counts.values())
         results.append(
             CapResult(
                 max_files=cap,
@@ -184,42 +206,56 @@ def build_labels(
     commits: Sequence[CommitChange],
     cutoff_files: Collection[str],
     max_files: int | None = None,
+    closed_bugs: Collection[int] = frozenset(),
 ) -> Labels:
-    """Count Fix commits per Cutoff-date file.
+    """Count Fix commits per Cutoff-date file, for both label sets.
 
     `commits` are the non-merge commits in the Label window, newest first as `list_commits`
     returns them; commits with equal times keep git order. `cutoff_files` are the
     paths in the tree at the Pinned SHA; only the eligible ones are counted, each with at least
-    a zero. A commit counts once per file. A path is followed through renames back to its
-    Cutoff-date path, files deleted later keep their count, and files created later are ignored.
-    A Fix commit touching more than `max_files` eligible files is dropped; `None` means uncapped.
+    a zero. `closed_bugs` are the numbers of the issues the tracker reports as closed bugs when
+    this is called; a commit is in the primary set when it links one (ADR 0004, ADR 0006). A
+    commit counts once per file. A path is followed through renames back to its Cutoff-date
+    path, files deleted later keep their count, and files created later are ignored. A Fix
+    commit touching more than `max_files` eligible files is dropped; `None` means uncapped.
     """
     eligible = {path for path in cutoff_files if is_eligible(path)}
-    counts = dict.fromkeys(sorted(eligible), 0)
+    keyword_counts = dict.fromkeys(sorted(eligible), 0)
+    counts = dict(keyword_counts)
     origin = {path: path for path in cutoff_files}
-    fix_commits = [c for c in commits if is_keyword_fix(c)]
-    fixes = {c.sha for c in fix_commits}
-    dropped = 0
+    keyword_fixes = {c.sha for c in commits if is_keyword_fix(c)}
+    tracker_fixes = {c.sha for c in commits if is_tracker_fix(c, closed_bugs)}
+    dropped: dict[str, int] = {"keyword": 0, "tracker": 0}
     oldest_first = list(
         reversed(commits)
     )  # the sort below is stable, so equal times stay in git order
     oldest_first.sort(key=lambda c: c.committed_at)
     for commit in oldest_first:
-        touched = _touched(commit, origin)
-        if commit.sha not in fixes:
-            continue
-        if max_files is not None and sum(is_eligible(f.path) for f in commit.files) > max_files:
-            dropped += 1
-            continue
-        for path in touched & eligible:
-            counts[path] += 1
+        touched = _touched(commit, origin) & eligible
+        too_wide = (
+            max_files is not None and sum(is_eligible(f.path) for f in commit.files) > max_files
+        )
+        for name, fixes, target in (
+            ("keyword", keyword_fixes, keyword_counts),
+            ("tracker", tracker_fixes, counts),
+        ):
+            if commit.sha not in fixes:
+                continue
+            if too_wide:
+                dropped[name] += 1
+                continue
+            for path in touched:
+                target[path] += 1
+    keyword_commits = [c for c in commits if c.sha in keyword_fixes]
     stats = {
         "commits_in_window": len(commits),
         "squash_share": _share(sum(map(is_squash_merge, commits)), len(commits)),
-        "fix_commits": len(fix_commits),
-        "fix_commits_dropped_by_cap": dropped,
+        "fix_commits": len(keyword_commits),
+        "fix_commits_dropped_by_cap": dropped["keyword"],
         "pr_number_only_share": _share(
-            sum(map(carries_only_pr_number, fix_commits)), len(fix_commits)
+            sum(map(carries_only_pr_number, keyword_commits)), len(keyword_commits)
         ),
+        "tracker_fix_commits": len(tracker_fixes),
+        "tracker_fix_commits_dropped_by_cap": dropped["tracker"],
     }
-    return Labels(counts=counts, stats=stats)
+    return Labels(counts=counts, keyword_counts=keyword_counts, stats=stats)

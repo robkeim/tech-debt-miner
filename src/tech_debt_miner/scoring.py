@@ -19,6 +19,7 @@ type _Item = tuple[str, int, int]  # (path, effort, Label)
 PRIMARY_K = 20
 REPORTED_KS = (5, 10, 50)
 LOC_BUDGET = Fraction(1, 5)
+MIN_LABELED_FILES = 10  # minimum data: files with a Label of 1 or more (ADR 0005)
 
 _EXACT_GROUP_LIMIT = 10  # largest tie group enumerated exactly (ADR 0018)
 _EXACT_STATE_LIMIT = 256  # most leftover-budget states carried while enumerating exactly

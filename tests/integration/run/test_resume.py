@@ -10,6 +10,7 @@ from tech_debt_miner.run import snapshot as snapshot_module
 from tech_debt_miner.run.artifacts import LABELS, RANKING, SNAPSHOT
 from tech_debt_miner.run.label import LabelDeps, WindowOpenError
 from tech_debt_miner.run.run_dir import RunDir, RunState, Stage
+from tech_debt_miner.run.score import ScoreDeps
 from tech_debt_miner.run.snapshot import SnapshotDeps
 from tech_debt_miner.run.stages import StageDeps, resume
 from tech_debt_miner.types import Manifest
@@ -56,10 +57,16 @@ def new_run(tmp_path: Path, repos_dir: Path) -> RunDir:
     return RunDir.create(tmp_path / "runs", manifest, lambda: at(2026, 11, 24))
 
 
+def no_bugs(_repo: str) -> set[int]:
+    return set()
+
+
 def deps_for(repos_dir: Path, today: datetime = AFTER_WINDOW) -> StageDeps:
     return StageDeps(
         snapshot=SnapshotDeps(repos_dir=repos_dir, issues=None),
         label=LabelDeps(repos_dir=repos_dir, clock=lambda: today, update_clone=None),
+        closed_bugs=no_bugs,
+        score=ScoreDeps(clock=lambda: today),
     )
 
 
@@ -89,10 +96,10 @@ def test_resume_run_continues_the_same_directory_and_keeps_done_artifacts(
 
     ran = resume(run_dir, deps_for(repos_dir), run=True)
 
-    assert ran == [Stage.RANK, Stage.LABEL]
+    assert ran == [Stage.RANK, Stage.LABEL, Stage.SCORE]
     assert (run_dir.path / "snapshot.json").read_bytes() == planned
-    assert run_dir.state() is RunState.RANKED
-    assert run_dir.next_stage() is Stage.SCORE
+    assert run_dir.state() is RunState.SCORED
+    assert run_dir.next_stage() is None
 
 
 def test_resume_of_a_finished_run_does_nothing(tmp_path: Path, repos_dir: Path) -> None:
@@ -112,7 +119,7 @@ def test_a_stage_that_stops_the_run_leaves_the_earlier_stages_done(
 
     assert run_dir.is_done(Stage.RANK)
     assert not run_dir.exists(LABELS)
-    assert resume(run_dir, deps_for(repos_dir), run=True) == [Stage.LABEL]
+    assert resume(run_dir, deps_for(repos_dir), run=True) == [Stage.LABEL, Stage.SCORE]
 
 
 def test_a_stage_killed_midway_leaves_no_partial_artifact(
