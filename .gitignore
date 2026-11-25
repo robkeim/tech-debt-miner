@@ -233,3 +233,4 @@ repos/
 
 # Run directories (ADR 0008)
 runs/
+.demo/

@@ -43,13 +43,13 @@ query($owner: String!, $name: String!, $after: String, $pageSize: Int!) {
   repository(owner: $owner, name: $name) {
     issues(first: $pageSize, after: $after, states: [CLOSED]) {
       pageInfo { hasNextPage endCursor }
-      nodes { number issueType { name } }
+      nodes { number issueType { name } labels(first: 100) { nodes { name } } }
     }
   }
 }
 """
 
-BUG_TYPE = "bug"  # the issue type's name, compared ignoring case
+BUG_TYPE = "bug"  # the issue type's or label's name, compared ignoring case
 
 # Runs a GraphQL query with variables and returns the decoded response.
 GraphQL = Callable[[str, Mapping[str, str | int | None]], Mapping[str, Any]]
@@ -106,7 +106,7 @@ def fetch_issues(
 def fetch_closed_bugs(
     repo: str, graphql: GraphQL = gh_graphql, page_size: int = PAGE_SIZE
 ) -> frozenset[int]:
-    """Return the numbers of every issue of `owner/name` that is closed and typed Bug today.
+    """Return the numbers of every closed issue of `owner/name` typed Bug or labeled `bug` today.
 
     This reads the tracker's current state, not its state at the Cutoff date: issue state is
     read at scoring time (ADR 0006). Pull requests are not issues in this API.
@@ -120,12 +120,19 @@ def fetch_closed_bugs(
         )
         page = _page(response)
         for node in page["nodes"]:
-            issue_type = node["issueType"]
-            if issue_type is not None and issue_type["name"].casefold() == BUG_TYPE:
+            if _is_bug(node):
                 bugs.add(node["number"])
         if not page["pageInfo"]["hasNextPage"]:
             return frozenset(bugs)
         after = page["pageInfo"]["endCursor"]
+
+
+def _is_bug(node: Mapping[str, Any]) -> bool:
+    # Repos without issue types (mypy, sentry-python) mark bugs with a label instead (ADR 0004).
+    issue_type = node["issueType"]
+    if issue_type is not None and issue_type["name"].casefold() == BUG_TYPE:
+        return True
+    return any(label["name"].casefold() == BUG_TYPE for label in node["labels"]["nodes"])
 
 
 def _page(response: Mapping[str, Any]) -> Mapping[str, Any]:
