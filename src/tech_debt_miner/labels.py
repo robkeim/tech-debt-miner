@@ -18,6 +18,8 @@ from tech_debt_miner.types import CapResult, Labels
 WINDOW_MONTHS = 6  # ADR 0005
 CAP_PERCENTILE = 90  # N is this percentile of fix sizes (ADR 0004)
 CAP_GRID: tuple[int | None, ...] = (5, 10, 20, None)  # the sensitivity caps; None is uncapped
+SHORT_WINDOW_MONTHS = 3  # the sensitivity windows (ADR 0005)
+LONG_WINDOW_MONTHS = 12
 SAMPLE_SIZE = 30  # Fix commits per Target repo on the review sheet (ADR 0004)
 SAMPLE_SEED = 20260711  # fixed, so the same commits always give the same sheet
 
@@ -33,16 +35,27 @@ def window_start(cutoff: date) -> date:
     return cutoff + timedelta(days=1)
 
 
-def window_end(cutoff: date) -> date:
-    """Last day of the Label window: the Cutoff date plus 6 months, clamped to month end."""
-    month_index = cutoff.month - 1 + WINDOW_MONTHS
+def window_end(cutoff: date, months: int = WINDOW_MONTHS) -> date:
+    """Last day of a Label window: the Cutoff date plus `months`, clamped to month end."""
+    month_index = cutoff.month - 1 + months
     year, month = cutoff.year + month_index // 12, month_index % 12 + 1
     return date(year, month, min(cutoff.day, calendar.monthrange(year, month)[1]))
 
 
-def window_is_closed(cutoff: date, today: date) -> bool:
-    """Whether every day of the window `(cutoff, cutoff + 6 months]` has passed."""
-    return today > window_end(cutoff)
+def window_is_closed(cutoff: date, today: date, months: int = WINDOW_MONTHS) -> bool:
+    """Whether every day of the window `(cutoff, cutoff + months]` has passed."""
+    return today > window_end(cutoff, months)
+
+
+def variant_name(cap: int | None) -> str:
+    """Name of the fix-size-cap variant in `Labels.variants`."""
+    return "cap-none" if cap is None else f"cap-{cap}"
+
+
+WINDOW_VARIANTS = (
+    (f"window-{SHORT_WINDOW_MONTHS}m", SHORT_WINDOW_MONTHS),
+    (f"window-{LONG_WINDOW_MONTHS}m", LONG_WINDOW_MONTHS),
+)
 
 
 def is_bot(commit: CommitChange) -> bool:
@@ -259,3 +272,31 @@ def build_labels(
         "tracker_fix_commits_dropped_by_cap": dropped["tracker"],
     }
     return Labels(counts=counts, keyword_counts=keyword_counts, stats=stats)
+
+
+def build_variants(  # noqa: PLR0913 - one input per axis the variants vary
+    commits: Sequence[CommitChange],
+    later_commits: Sequence[CommitChange],
+    cutoff_files: Collection[str],
+    *,
+    max_files: int | None,
+    closed_bugs: Collection[int],
+    cutoff: date,
+) -> dict[str, dict[str, int]]:
+    """Tracker-confirmed counts under each ADR 0005 sensitivity variant, keyed by variant name.
+
+    `commits` are the 6-month window's and `later_commits` the ones after it, up to 12 months;
+    pass no `later_commits` when that window is still open and the 12-month variant is left
+    out. Windows keep the primary N; caps keep the 6-month window.
+    """
+    variants = {
+        variant_name(cap): dict(build_labels(commits, cutoff_files, cap, closed_bugs).counts)
+        for cap in CAP_GRID
+    }
+    for name, months in WINDOW_VARIANTS:
+        if months > WINDOW_MONTHS and not later_commits:
+            continue
+        end = window_end(cutoff, months)
+        within = [c for c in (*later_commits, *commits) if c.committed_at.date() <= end]
+        variants[name] = dict(build_labels(within, cutoff_files, max_files, closed_bugs).counts)
+    return variants

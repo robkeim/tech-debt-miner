@@ -33,7 +33,7 @@ A local store of LLM responses keyed by the exact request, the transport's think
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
-A Run that builds every prompt and estimates cost but makes no LLM calls. Until the LLM rank stage exists (#88) it only runs `resolve` and `snapshot` and stops; there are no prompts or cost estimate yet.
+A Run that builds every prompt and estimates cost but makes no LLM calls. Until the LLM rank stage exists (#89) it only runs `resolve` and `snapshot` and stops; there are no prompts or cost estimate yet.
 
 **Leakage test**:
 A test proving that nothing dated after the Cutoff date reaches a prompt or feature.
@@ -48,7 +48,7 @@ A Fix commit of the primary set: it links an issue (`#N` or an `/issues/N` URL, 
 _Avoid_: Confirmed bug, linked fix
 
 **Label**:
-The per-file ground truth: the number of distinct tracker-confirmed Fix commits touching the file after the Cutoff date (`counts` in `labels.json`; the keyword-only set is `keyword_counts`), counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
+The per-file ground truth: the number of distinct tracker-confirmed Fix commits touching the file after the Cutoff date (`counts` in `labels.json`; the keyword-only set is `keyword_counts`, and `variants` holds the report-only caps and 3- and 12-month windows of [ADR 0021](docs/adr/0021-sensitivity-checks-in-report.md)), counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Fix size**:

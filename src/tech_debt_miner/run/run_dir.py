@@ -25,7 +25,7 @@ LLM = "llm"
 
 # The heuristic-only loop (M1): nothing writes `requests.jsonl` or LLM rankings yet, so a Run is
 # planned once `snapshot.json` exists and `rank` is done with the Baseline ranking alone. The
-# LLM rank stage (#88) sets this to True, which restores the full ADR 0008 rules.
+# LLM rank stage (#89) sets this to True, which restores the full ADR 0008 rules.
 LLM_RANKING = False
 
 

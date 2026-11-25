@@ -97,3 +97,4 @@ Report-only; none can change the verdict. If one flips the direction, the report
 - 2026-11-24: The duplicate-file rule is clarified by [ADR 0013](0013-duplicate-files-keep-their-slot.md).
 - 2026-11-25: The recall budget and tie averaging are specified by [ADR 0018](0018-recall-budget-and-effort-map.md).
 - 2026-11-25: The aggregation and bootstrap details are specified by [ADR 0020](0020-report-aggregation-and-bootstrap.md).
+- 2026-11-25: The sensitivity checks are specified by [ADR 0021](0021-sensitivity-checks-in-report.md).

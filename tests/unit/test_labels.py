@@ -1,3 +1,4 @@
+import dataclasses
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -381,3 +382,70 @@ def test_tracker_fixes_follow_renames_like_keyword_fixes() -> None:
     ]
 
     assert dict(labels.build_labels(commits, ["a.py"], closed_bugs={7}).counts) == {"a.py": 1}
+
+
+def test_variants_cover_every_cap_and_both_windows() -> None:
+    fixes = [commit("fix a", "a.py", day=10), commit("fix b", "a.py", day=100)]
+    later = [commit("fix c", "a.py", day=250)]
+    got = labels.build_variants(
+        fixes,
+        later,
+        ["a.py"],
+        max_files=None,
+        closed_bugs=set(),
+        cutoff=date(2024, 1, 31),
+    )
+    assert set(got) == {"cap-5", "cap-10", "cap-20", "cap-none", "window-3m", "window-12m"}
+
+
+def test_variants_use_a_shorter_and_a_longer_window_than_the_primary() -> None:
+    # START is 2024-02-01 and the Cutoff date is 2024-01-31, so day 10 is inside 3 months,
+    # day 100 is after them, and day 250 is after the 6-month window.
+    fixes = [commit("fix a", "a.py", day=10), commit("fix b", "a.py", day=100)]
+    later = [commit("fix c", "a.py", day=250)]
+    got = labels.build_variants(
+        [replace_message(c) for c in fixes],
+        [replace_message(c) for c in later],
+        ["a.py"],
+        max_files=None,
+        closed_bugs={7},
+        cutoff=date(2024, 1, 31),
+    )
+    assert got["window-3m"] == {"a.py": 1}
+    assert got["window-12m"] == {"a.py": 3}
+    assert got["cap-none"] == {"a.py": 2}
+
+
+def replace_message(c: CommitChange) -> CommitChange:
+    return dataclasses.replace(c, message=f"{c.message} (fixes #7)")
+
+
+def test_the_twelve_month_variant_is_left_out_while_that_window_is_open() -> None:
+    got = labels.build_variants(
+        [], [], ["a.py"], max_files=None, closed_bugs=set(), cutoff=date(2024, 1, 31)
+    )
+    assert "window-12m" not in got
+    assert "window-3m" in got
+
+
+def test_a_cap_variant_drops_the_wide_fix() -> None:
+    wide = commit("fix wide (fixes #7)", "a.py", "b.py", "c.py", day=5)
+    got = labels.build_variants(
+        [wide],
+        [],
+        ["a.py", "b.py", "c.py"],
+        max_files=None,
+        closed_bugs={7},
+        cutoff=date(2024, 1, 31),
+    )
+    assert got["cap-none"]["a.py"] == 1
+    assert got["cap-5"]["a.py"] == 1
+    narrow = labels.build_variants(
+        [wide],
+        [],
+        ["a.py", "b.py", "c.py"],
+        max_files=2,
+        closed_bugs={7},
+        cutoff=date(2024, 1, 31),
+    )
+    assert narrow["window-3m"]["a.py"] == 0
