@@ -19,7 +19,7 @@ RANK_TEMPLATE = "rank"
 TRIAGE_SET_SIZE = 100  # the Triage set holds `min(TRIAGE_SET_SIZE, eligible files)`
 RANKING_SIZE = 50  # the most files stage 2 returns
 DIGEST_MAX_SUBJECTS = 5
-# Conservative: real code averages nearer 4 characters a token (ADR 0022).
+# Conservative: real code averages nearer 4 characters a token (ADR 0023).
 CHARS_PER_TOKEN = 3
 # What the stage 1 digest may use. Sonnet 5.5 reads 1M tokens; the rest is for the template, the
 # output and slack in the estimate. A convention, not a tuned value.

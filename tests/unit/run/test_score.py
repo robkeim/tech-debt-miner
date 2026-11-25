@@ -4,10 +4,17 @@ from pathlib import Path
 import pytest
 
 from tech_debt_miner import cli, scoring
-from tech_debt_miner.run.artifacts import LABELS, RANKING, SCORES, SNAPSHOT, ranking_name
+from tech_debt_miner.run.artifacts import (
+    LABELS,
+    LABELS_12M,
+    RANKING,
+    SCORES,
+    SNAPSHOT,
+    ranking_name,
+)
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
-from tech_debt_miner.types import FileFacts, Labels, Manifest, Ranking, Snapshot
+from tech_debt_miner.types import FileFacts, Labels, LateLabels, Manifest, Ranking, Snapshot
 
 pytestmark = pytest.mark.unit
 
@@ -176,3 +183,13 @@ def test_score_adds_the_sensitivity_metrics(tmp_path: Path) -> None:
         metrics
     )
     assert "ndcg@20[window-12m]" not in metrics
+
+
+def test_score_reads_the_later_12_month_counts_as_a_variant(tmp_path: Path) -> None:
+    run = make_run(tmp_path)
+    counts = run.read(LABELS).counts
+    run.write(LABELS_12M, LateLabels(counts, None, "t", "h", "d", fetched=False))
+
+    metrics = score(run, deps()).rankings["baseline"].metrics
+
+    assert "ndcg@20[window-12m]" in metrics

@@ -20,10 +20,12 @@ LEAF_MODULES = (
     SRC / "scoring.py",
     SRC / "report.py",
     SRC / "rankers" / "prompts.py",
+    SRC / "llm" / "cache.py",
 )
 ALLOWED = frozenset(
     {
         f"{PACKAGE}.types",
+        f"{PACKAGE}.jsonio",
         f"{PACKAGE}.repo.history",
         f"{PACKAGE}.repo.cutoff",
         f"{PACKAGE}.repo.eligibility",

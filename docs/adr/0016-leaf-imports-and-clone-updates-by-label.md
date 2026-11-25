@@ -28,4 +28,5 @@ Accepted. Decided in #72. Relaxes two rules of [ADR 0009](0009-code-layout-and-c
 ## Amendments
 
 - 2026-11-24: `validate` (#79) also fast-forwards the clone, through the same `read_window` as `label` and with the same `--no-fetch` escape, so N is computed from the commits the Label will count. "Only `label` updates a clone" now reads "only `label` and `validate`".
-- 2026-11-25: [ADR 0022](0022-prompt-templates-and-digest-budget.md) adds `repo/source.py` to the pure `repo` modules a leaf may import.
+- 2026-11-25: [ADR 0023](0023-prompt-templates-and-digest-budget.md) adds `repo/source.py` to the pure `repo` modules a leaf may import.
+- 2026-11-25: `jsonio.py` (standard library plus `types` only) joins the modules a leaf may import, and `llm/cache.py` becomes a leaf. It holds the generic JSON helpers (`canonical_json`, `write_json`, `read_json` and the rest) that `run/store.py` used to own, so the cache key hash and `RunDir` share one `canonical_json` (#120).
