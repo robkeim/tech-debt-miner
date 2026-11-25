@@ -12,6 +12,7 @@ from tech_debt_miner.types import Manifest
 ADR_FILES = {
     "0005": "docs/adr/0005-scoring-pre-registration.md",
     "0007": "docs/adr/0007-heuristic-baseline-definition.md",
+    "0012": "docs/adr/0012-llm-repeats-use-default-sampling.md",
 }
 
 
