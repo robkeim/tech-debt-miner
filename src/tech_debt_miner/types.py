@@ -199,6 +199,25 @@ class Probe:
 
 
 @dataclass(frozen=True)
+class CostAttempt:
+    """One invocation's slice of a Run's spend, with the `--max-usd` cap it ran under."""
+
+    max_usd: float
+    spent_usd: float  # spent by this invocation alone
+
+
+@dataclass(frozen=True)
+class Cost:
+    """A Run's `cost.json`: the attempts, oldest first. Their sum is the Run's actual spend."""
+
+    attempts: tuple[CostAttempt, ...] = ()
+
+    @property
+    def spent_usd(self) -> float:
+        return sum(attempt.spent_usd for attempt in self.attempts)
+
+
+@dataclass(frozen=True)
 class LoggedResponse:
     """One row of a Run's `responses.jsonl`: a Response and the request identity it answers."""
 

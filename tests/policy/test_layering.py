@@ -15,7 +15,7 @@ pytestmark = pytest.mark.policy
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = "tech_debt_miner"
 SRC = ROOT / "src" / PACKAGE
-LEAF_MODULES = (SRC / "labels.py", SRC / "scoring.py")
+LEAF_MODULES = (SRC / "labels.py", SRC / "scoring.py", SRC / "report.py")
 ALLOWED = frozenset(
     {
         f"{PACKAGE}.types",
