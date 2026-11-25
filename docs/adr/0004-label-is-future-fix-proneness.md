@@ -36,3 +36,6 @@ The numeric parameters (N, exclusion globs, window length) belong to the pre-reg
   - **Tracker read:** `label` reads every closed issue's type once, after the window check, so the state is that of the scoring date ([ADR 0006](0006-target-repos-and-cutoff-dates.md)). `labels.json` records `issues_read_at` and the `linked_closed_bugs` it saw, and a re-score needs a new Run.
   - **N:** still computed from keyword fix sizes only, as before.
 - 2026-11-25: `labels.json` also holds tracker-confirmed counts per sensitivity variant (caps and the 3- and 12-month windows), see [ADR 0021](0021-sensitivity-checks-in-report.md).
+- 2026-11-25: A linked issue counts as a bug when it is closed and typed Bug **or** carries the `bug` label (case-insensitive), replacing "typed Bug" in the `label` (#74) entry above (#140).
+  - **Why:** [ADR 0006](0006-target-repos-and-cutoff-dates.md) measured the frozen repos' counts with "typed or labeled". `mypy` and `sentry-python` have no issue types at all, so the typed-only code gave a primary Label of 0 and every Run would be excluded.
+  - **Not changed:** the keyword set, the cap N, and the exclusions. The code change and the 2026-12-31 recount are tracked in #140.
