@@ -28,6 +28,7 @@ from tech_debt_miner.types import (
     FileFacts,
     Issue,
     Labels,
+    LateLabels,
     LoggedResponse,
     Manifest,
     OutlineEntry,
@@ -137,6 +138,10 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
     ),
     "cost": (Cost((CostAttempt(4.0, 1.5), CostAttempt(6.0, 0.5))), None),
     "labels": (Labels({"a.py": 1}), None),
+    "labels-12m": (
+        LateLabels({"a.py": 2}, 3, "2027-07-01T00:00:00+00:00", "h" * 40, "d", fetched=True),
+        None,
+    ),
     "validation": (
         Validation(
             cap_n=3,

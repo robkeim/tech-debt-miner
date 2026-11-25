@@ -129,6 +129,20 @@ class Labels:
 
 
 @dataclass(frozen=True)
+class LateLabels:
+    """The 12-month window's counts, written by `label-later` after `labels.json` (ADR 0022)."""
+
+    # Cutoff-date path -> tracker-confirmed Fix commits in `(Cutoff date, Cutoff date + 12 months]`,
+    # at the primary N. `score` reads it as the `window-12m` variant.
+    counts: Mapping[str, int]
+    max_files: int | None  # the fix-size cap N used; it must equal the primary's
+    issues_read_at: str  # when the tracker was read, which is later than for `labels.json`
+    clone_head: str
+    clone_newest_commit: str
+    fetched: bool
+
+
+@dataclass(frozen=True)
 class CapResult:
     """The Label's outcome under one fix-size cap; `max_files` None is uncapped."""
 

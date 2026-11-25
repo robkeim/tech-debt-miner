@@ -16,6 +16,7 @@ from tech_debt_miner.types import (
     BASELINE,
     Cost,
     Labels,
+    LateLabels,
     LoggedResponse,
     Manifest,
     Probe,
@@ -77,6 +78,13 @@ COST = Artifact[Cost, None](
 )
 LABELS = Artifact[Labels, None](
     "labels", _fixed("labels.json"), jsonio.to_json, store.labels_from_json, Policy.REPLACE
+)
+LABELS_12M = Artifact[LateLabels, None](
+    "labels-12m",
+    _fixed("labels-12m.json"),
+    store.to_json,
+    store.late_labels_from_json,
+    Policy.CREATE_ONCE,
 )
 VALIDATION = Artifact[Validation, None](
     "validation",
@@ -143,6 +151,7 @@ ALL: tuple[Artifact[Any, Any], ...] = (
     RESPONSES,
     COST,
     LABELS,
+    LABELS_12M,
     VALIDATION,
     PROBE,
     RANKING,

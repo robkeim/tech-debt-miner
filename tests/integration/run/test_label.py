@@ -8,8 +8,15 @@ from support.fixture_repo import Commit, build_fixture_repo, git
 from tech_debt_miner import cli
 from tech_debt_miner.repo import git as repo_git
 from tech_debt_miner.repo.git import resolve_pinned_sha
-from tech_debt_miner.run.artifacts import LABELS
-from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
+from tech_debt_miner.run.artifacts import LABELS, LABELS_12M
+from tech_debt_miner.run.label import (
+    CloneUpdateError,
+    LabelDeps,
+    LabelMissingError,
+    WindowOpenError,
+    label,
+    label_later,
+)
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import Manifest
 
@@ -386,3 +393,99 @@ def test_label_adds_the_12_month_variant_once_that_window_has_closed(
     result = label(run_dir, late, no_bugs)
 
     assert "window-12m" in result.variants
+
+
+AFTER_LONG_WINDOW = datetime(2025, 2, 1, tzinfo=UTC)
+
+
+def long_deps(repos_dir: Path, max_files: int | None = None) -> LabelDeps:
+    return LabelDeps(
+        repos_dir=repos_dir,
+        clock=lambda: AFTER_LONG_WINDOW,
+        update_clone=None,
+        max_files=max_files,
+    )
+
+
+def test_label_later_counts_the_12_month_window_without_touching_labels_json(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    target = repos_dir / "target"
+    add_commit(target, "closes #7", {"a.py": BODY + "# 7\n"}, at(2024, 9, 1))
+    add_commit(target, "closes #7 after", {"a.py": BODY + "# 8\n"}, at(2025, 1, 2))
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir), lambda _repo: {7})
+    before = (run_dir.path / "labels.json").read_bytes()
+
+    result = label_later(run_dir, long_deps(repos_dir), lambda _repo: {7})
+
+    assert (run_dir.path / "labels.json").read_bytes() == before
+    assert dict(result.counts) == {"a.py": 1, "b.py": 0, "c.py": 0}
+    assert result.issues_read_at == AFTER_LONG_WINDOW.isoformat()
+    assert run_dir.read(LABELS_12M) == result
+
+
+def test_label_later_refuses_until_the_12_month_window_has_closed(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, deps_for(repos_dir), no_bugs)
+
+    with pytest.raises(WindowOpenError, match="2025-01-01"):
+        label_later(run_dir, deps_for(repos_dir), no_bugs)
+
+    assert not run_dir.exists(LABELS_12M)
+
+
+def test_label_later_needs_labels_and_never_overwrites(tmp_path: Path, repos_dir: Path) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    with pytest.raises(LabelMissingError):
+        label_later(run_dir, long_deps(repos_dir), no_bugs)
+    label(run_dir, deps_for(repos_dir), no_bugs)
+    label_later(run_dir, long_deps(repos_dir), no_bugs)
+
+    with pytest.raises(FileExistsError, match="already exists"):
+        label_later(run_dir, long_deps(repos_dir), no_bugs)
+
+
+def test_label_later_refuses_when_labels_json_already_has_the_window(
+    tmp_path: Path, repos_dir: Path
+) -> None:
+    run_dir = make_run(tmp_path, repos_dir)
+    label(run_dir, long_deps(repos_dir), no_bugs)
+
+    with pytest.raises(FileExistsError, match="nothing to add"):
+        label_later(run_dir, long_deps(repos_dir), no_bugs)
+
+
+def test_cli_label_later_writes_labels_12m_and_reports_refusals(
+    tmp_path: Path,
+    repos_dir: Path,
+    frozen_clock: time_machine.Traveller,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(cli.github, "fetch_closed_bugs", no_bugs)
+    run_dir = make_run(tmp_path, repos_dir)
+    argv = [
+        "label-later",
+        run_dir.id,
+        "--repos-dir",
+        str(repos_dir),
+        "--runs-dir",
+        str(tmp_path / "runs"),
+        "--no-fetch",
+    ]
+    frozen_clock.move_to(AFTER_WINDOW)
+
+    assert cli.main(argv) == 1  # no labels.json yet
+    assert "run `label` first" in capsys.readouterr().err
+    label(run_dir, deps_for(repos_dir), no_bugs)
+    assert cli.main(argv) == 1  # the 12-month window is still open
+    assert "2025-01-01" in capsys.readouterr().err
+
+    frozen_clock.move_to(AFTER_LONG_WINDOW)
+    assert cli.main(argv) == 0
+    assert run_dir.exists(LABELS_12M)
+    assert cli.main(argv) == 1
+    assert "already exists" in capsys.readouterr().err
