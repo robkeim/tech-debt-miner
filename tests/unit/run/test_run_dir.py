@@ -23,9 +23,11 @@ from tech_debt_miner.types import (
     FileFacts,
     Issue,
     Labels,
+    LoggedResponse,
     Manifest,
     Ranking,
     Request,
+    Response,
     Scores,
     Snapshot,
 )
@@ -104,7 +106,12 @@ SAMPLES: dict[str, tuple[Any, Any]] = {
         None,
     ),
     "requests": (Request("llm", 0, 0, "m", "s", "p", 10), None),
-    "responses": ({"text": "hi"}, None),
+    "responses": (
+        LoggedResponse(
+            "llm", 0, 0, cache_hit=False, response=Response("hi", 1, 2, "end_turn", "req", "m")
+        ),
+        None,
+    ),
     "cost": ({"usd": 1.5}, None),
     "labels": (Labels({"a.py": 1}), None),
     "ranking": (Ranking("llm", 1, ("a.py",)), ("llm", 1)),
