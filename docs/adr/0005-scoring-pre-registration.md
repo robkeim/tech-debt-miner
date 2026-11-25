@@ -96,3 +96,4 @@ Report-only; none can change the verdict. If one flips the direction, the report
 - 2026-11-24: The "3 repeats at temperature 0" wording is amended by [ADR 0012](0012-llm-repeats-use-default-sampling.md).
 - 2026-11-24: The duplicate-file rule is clarified by [ADR 0013](0013-duplicate-files-keep-their-slot.md).
 - 2026-11-25: The recall budget and tie averaging are specified by [ADR 0018](0018-recall-budget-and-effort-map.md).
+- 2026-11-25: The aggregation and bootstrap details are specified by [ADR 0020](0020-report-aggregation-and-bootstrap.md).
