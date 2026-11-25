@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from tech_debt_miner.run.artifacts import RESPONSES
 from tech_debt_miner.run.run_dir import RunDir
-from tech_debt_miner.types import LoggedResponse, Ranking
+from tech_debt_miner.types import LoggedResponse, Ranking, singleton_groups
 
 
 def logged_responses(run_dir: RunDir) -> list[LoggedResponse]:
@@ -33,6 +33,6 @@ def replay_rankings(run_dir: RunDir, parse: Callable[[str], tuple[str, ...]]) ->
     parsed is never replayed as an empty ranking (ADR 0008).
     """
     return [
-        Ranking(ranker=ranker, repeat=repeat, paths=parse(row.response.text))
+        Ranking(ranker=ranker, repeat=repeat, groups=singleton_groups(parse(row.response.text)))
         for (ranker, repeat), row in sorted(final_responses(run_dir).items())
     ]

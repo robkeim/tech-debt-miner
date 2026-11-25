@@ -3,8 +3,7 @@
 from collections import defaultdict
 from fractions import Fraction
 
-from tech_debt_miner.run.artifacts import BASELINE
-from tech_debt_miner.types import Ranking, Snapshot
+from tech_debt_miner.types import BASELINE, Ranking, Snapshot
 
 
 def percentile_ranks(values: list[float]) -> list[Fraction]:
@@ -30,8 +29,9 @@ def percentile_ranks(values: list[float]) -> list[Fraction]:
 def tie_groups(snapshot: Snapshot) -> list[tuple[str, ...]]:
     """Return the files grouped by equal score, most risky group first.
 
-    Files in one group are tied (ADR 0007). Order inside a group is the Snapshot's and
-    carries no meaning; ADR 0005's tie averaging must treat the group as unordered.
+    Files in one group are tied (ADR 0007). Members are sorted by path only so the stored
+    bytes are deterministic; that order carries no meaning and is not a tie-break, because
+    ADR 0005's tie averaging treats the group as unordered (ADR 0019).
     """
     files = snapshot.files
     churn = percentile_ranks([float(f.churn) for f in files])
@@ -39,12 +39,11 @@ def tie_groups(snapshot: Snapshot) -> list[tuple[str, ...]]:
     by_score: dict[Fraction, list[str]] = defaultdict(list)
     for fact, churn_pct, complexity_pct in zip(files, churn, complexity, strict=True):
         by_score[churn_pct * complexity_pct].append(fact.path)
-    return [tuple(by_score[score]) for score in sorted(by_score, reverse=True)]
+    return [tuple(sorted(by_score[score])) for score in sorted(by_score, reverse=True)]
 
 
 class BaselineRanker:
     """Implements `Ranker`. `repeat` is ignored: the Baseline is deterministic."""
 
     def rank(self, snapshot: Snapshot, *, repeat: int) -> Ranking:  # noqa: ARG002 - protocol
-        paths = tuple(path for group in tie_groups(snapshot) for path in group)
-        return Ranking(ranker=BASELINE, repeat=0, paths=paths)
+        return Ranking(ranker=BASELINE, repeat=0, groups=tuple(tie_groups(snapshot)))

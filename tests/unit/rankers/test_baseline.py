@@ -45,24 +45,30 @@ def test_ranks_by_the_product_of_percentile_ranks_not_the_raw_product() -> None:
 
     ranking = BaselineRanker().rank(snapshot, repeat=0)
 
-    assert ranking.paths == ("balanced", "huge_churn", "third")
+    assert ranking.groups == (("balanced",), ("huge_churn",), ("third",))
 
 
 def test_equal_scores_stay_tied_with_no_path_name_tie_break() -> None:
-    # "z" and "a" are mirror images, so both score 2/3 * 1/3. Snapshot order, not name, decides
-    # the listing order inside the group, and tie_groups reports them as one group.
+    # "z" and "a" are mirror images, so both score 2/9 and form one tie group. Members are
+    # sorted by path only for deterministic bytes; the group is still unordered to the scorer.
     snapshot = snapshot_of(("z.py", 1, 2.0), ("a.py", 2, 1.0), ("top.py", 3, 3.0))
 
-    assert tie_groups(snapshot) == [("top.py",), ("z.py", "a.py")]
+    assert tie_groups(snapshot) == [("top.py",), ("a.py", "z.py")]
 
 
-def test_tie_groups_do_not_depend_on_file_order_beyond_the_listing() -> None:
+def test_the_ranking_keeps_the_tie_group_whole() -> None:
+    snapshot = snapshot_of(("z.py", 1, 2.0), ("a.py", 2, 1.0), ("top.py", 3, 3.0))
+
+    ranking = BaselineRanker().rank(snapshot, repeat=0)
+
+    assert ranking.groups == (("top.py",), ("a.py", "z.py"))
+
+
+def test_tie_groups_do_not_depend_on_file_order() -> None:
     forward = snapshot_of(("z.py", 1, 2.0), ("a.py", 2, 1.0), ("top.py", 3, 3.0))
     backward = Snapshot(files=forward.files[::-1], issues=(), zero_complexity_files=0)
 
-    assert [set(group) for group in tie_groups(forward)] == [
-        set(group) for group in tie_groups(backward)
-    ]
+    assert tie_groups(forward) == tie_groups(backward)
 
 
 def test_ranking_names_the_baseline_and_ignores_repeat() -> None:
@@ -76,12 +82,12 @@ def test_ranking_names_the_baseline_and_ignores_repeat() -> None:
 
 
 def test_a_snapshot_with_no_files_ranks_nothing() -> None:
-    assert BaselineRanker().rank(snapshot_of(), repeat=0).paths == ()
+    assert BaselineRanker().rank(snapshot_of(), repeat=0).groups == ()
 
 
 def test_the_baseline_implements_the_ranker_protocol() -> None:
     ranker: Ranker = BaselineRanker()
-    assert ranker.rank(snapshot_of(("a.py", 1, 1.0)), repeat=0).paths == ("a.py",)
+    assert ranker.rank(snapshot_of(("a.py", 1, 1.0)), repeat=0).groups == (("a.py",),)
 
 
 @given(

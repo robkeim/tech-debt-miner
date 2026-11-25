@@ -118,7 +118,11 @@ def request_from_json(data: Mapping[str, Any]) -> Request:
 
 
 def ranking_from_json(data: Mapping[str, Any]) -> Ranking:
-    return Ranking(ranker=data["ranker"], repeat=data["repeat"], paths=tuple(data["paths"]))
+    return Ranking(
+        ranker=data["ranker"],
+        repeat=data["repeat"],
+        groups=tuple(tuple(group) for group in data["groups"]),
+    )
 
 
 def labels_from_json(data: Mapping[str, Any]) -> Labels:

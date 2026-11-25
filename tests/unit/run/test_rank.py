@@ -46,7 +46,7 @@ def test_rank_writes_only_the_baseline_ranking(tmp_path: Path) -> None:
     rank(run_dir)
 
     assert run_dir.read(RANKING, ("baseline", 0)) == Ranking(
-        "baseline", 0, ("hot.py", "mid.py", "low.py")
+        "baseline", 0, (("hot.py",), ("mid.py",), ("low.py",))
     )
     assert sorted(p.name for p in (run_dir.path / "rankings").iterdir()) == ["baseline.json"]
     assert not run_dir.exists(REQUESTS)
@@ -96,3 +96,21 @@ def test_cli_rank_of_an_unknown_run_fails(
 ) -> None:
     assert cli.main(["rank", "nope", "--runs-dir", str(tmp_path)]) == 2
     assert "no such Run" in capsys.readouterr().err
+
+
+def test_rank_persists_a_tie_group_and_reads_it_back(tmp_path: Path) -> None:
+    run_dir = new_run(tmp_path)
+    tied = Snapshot(
+        files=(
+            FileFacts("z.py", loc=5, churn=1, complexity=2.0),
+            FileFacts("a.py", loc=5, churn=2, complexity=1.0),
+            FileFacts("top.py", loc=5, churn=3, complexity=3.0),
+        ),
+        issues=(),
+        zero_complexity_files=0,
+    )
+    run_dir.write(SNAPSHOT, tied)
+
+    rank(run_dir)
+
+    assert run_dir.read(RANKING, ("baseline", 0)).groups == (("top.py",), ("a.py", "z.py"))
