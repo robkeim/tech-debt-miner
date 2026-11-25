@@ -1,6 +1,6 @@
 """The `label` stage: count Fix commits per file in the closed Label window (ADR 0004, ADR 0008)."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -23,6 +23,10 @@ class CloneUpdateError(RuntimeError):
 
 class CapMismatchError(ValueError):
     """`--max-files` differs from the N that `validate` fixed for the Run."""
+
+
+# `owner/name` -> the numbers of its issues that are closed and typed Bug right now.
+ClosedBugs = Callable[[str], Collection[int]]
 
 
 @dataclass(frozen=True)
@@ -72,11 +76,13 @@ def read_window(run_dir: RunDir, deps: LabelDeps) -> LabelWindow:
     return LabelWindow(clone, commits, git.list_files(clone, manifest.pinned_sha))
 
 
-def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
+def label(run_dir: RunDir, deps: LabelDeps, closed_bugs: ClosedBugs) -> Labels:
     """Write `labels.json` for the Run, or raise `WindowOpenError` while the window is open.
 
     Labels are scoring input only and never reach a prompt. `labels.json` records the clone's
-    HEAD, its newest commit date and whether an update ran (see `read_window`).
+    HEAD, its newest commit date and whether an update ran (see `read_window`). `closed_bugs`
+    is read after the window check, so a refused Run makes no tracker call. A Fix commit
+    counts whenever its issue closed, since the state is read now (ADR 0006).
     """
     if run_dir.exists(LABELS):
         msg = f"{LABELS.path(None)} already exists; N is fixed before any scored Run"
@@ -88,9 +94,15 @@ def label(run_dir: RunDir, deps: LabelDeps) -> Labels:
         )
         raise CapMismatchError(msg)
     window = read_window(run_dir, deps)
-    result = labels.build_labels(window.commits, window.cutoff_files, deps.max_files)
+    repo = run_dir.read(MANIFEST).target_repo
+    bugs = frozenset(closed_bugs(repo))
+    read_at = deps.clock()
+    result = labels.build_labels(window.commits, window.cutoff_files, deps.max_files, bugs)
+    linked = {n for commit in window.commits for n in labels.linked_issues(commit)}
     result = replace(
         result,
+        linked_closed_bugs=tuple(sorted(linked & bugs)),
+        issues_read_at=read_at.isoformat(),
         clone_head=git.head_sha(window.clone),
         clone_newest_commit=git.head_committed_at(window.clone).isoformat(),
         fetched=deps.update_clone is not None,

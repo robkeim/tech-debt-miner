@@ -187,8 +187,8 @@ def _label(args: argparse.Namespace) -> int:
         max_files=args.max_files,
     )
     try:
-        label(run_dir, deps)
-    except (WindowOpenError, CloneUpdateError, CapMismatchError) as error:
+        label(run_dir, deps, github.fetch_closed_bugs)
+    except (WindowOpenError, CloneUpdateError, CapMismatchError, github.GitHubError) as error:
         print(error, file=sys.stderr)
         return 1
     return 0
