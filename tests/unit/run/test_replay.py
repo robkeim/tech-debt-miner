@@ -56,8 +56,8 @@ def test_replay_scores_from_the_run_directory_alone(tmp_path: Path) -> None:
     for entry in (tmp_path / "cache").glob("*/*.json"):
         entry.unlink()
     assert replay_rankings(run, parse_paths) == [
-        Ranking("llm", 0, ("a.py", "b.py")),
-        Ranking("llm", 1, ("b.py", "a.py")),
+        Ranking("llm", 0, (("a.py",), ("b.py",))),
+        Ranking("llm", 1, (("b.py",), ("a.py",))),
     ]
 
 
@@ -78,7 +78,7 @@ def test_the_highest_attempt_wins(tmp_path: Path) -> None:
     assert client.complete_parsed(REQUEST, parse_paths) == ("a.py",)
     assert [row.attempt for row in logged_responses(run)] == [0, 1]
     assert final_responses(run)["llm", 0].response.text == "a.py"
-    assert replay_rankings(run, parse_paths) == [Ranking("llm", 0, ("a.py",))]
+    assert replay_rankings(run, parse_paths) == [Ranking("llm", 0, (("a.py",),))]
 
 
 def test_a_resume_that_logs_the_same_attempt_twice_collapses(tmp_path: Path) -> None:
