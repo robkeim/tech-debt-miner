@@ -33,7 +33,7 @@ A local store of LLM responses keyed by the exact request, repeat index and atte
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
-A Run that builds every prompt and estimates cost but makes no LLM calls. Until the LLM rank stage exists (#88) it only runs `resolve` and `snapshot` and stops; there are no prompts or cost estimate yet.
+A Run that builds every prompt and estimates cost but makes no LLM calls. Until the LLM rank stage exists (#89) it only runs `resolve` and `snapshot` and stops; there are no prompts or cost estimate yet.
 
 **Leakage test**:
 A test proving that nothing dated after the Cutoff date reaches a prompt or feature.
