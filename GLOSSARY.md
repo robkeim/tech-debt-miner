@@ -80,5 +80,5 @@ Files a ranker ranks equally. Scoring averages every metric over all orderings o
 _Avoid_: Bucket, tied set
 
 **Effort map**:
-The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0017](docs/adr/0017-recall-budget-and-effort-map.md)).
+The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0018](docs/adr/0018-recall-budget-and-effort-map.md)).
 _Avoid_: LOC map, size map

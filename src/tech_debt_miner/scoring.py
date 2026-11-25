@@ -1,4 +1,4 @@
-"""Scoring: nDCG@k, recall at an effort budget and the reported metrics (ADR 0005, 0013, 0017).
+"""Scoring: nDCG@k, recall at an effort budget and the reported metrics (ADR 0005, 0013, 0018).
 
 Pure functions. A ranking is a sequence of tie groups, most risky group first; files in one
 group are tied and every metric averages over all orderings of each group.
@@ -20,7 +20,7 @@ PRIMARY_K = 20
 REPORTED_KS = (5, 10, 50)
 LOC_BUDGET = Fraction(1, 5)
 
-_EXACT_GROUP_LIMIT = 10  # largest tie group enumerated exactly (ADR 0017)
+_EXACT_GROUP_LIMIT = 10  # largest tie group enumerated exactly (ADR 0018)
 _EXACT_STATE_LIMIT = 256  # most leftover-budget states carried while enumerating exactly
 _SAMPLES = 2000
 _SEED = 20_260_101
@@ -188,7 +188,7 @@ def recall_at_budget(
     effort: Mapping[str, int],
     fraction: Fraction = LOC_BUDGET,
 ) -> float:
-    """Share of all Label mass found within `fraction` of the total effort (ADR 0017).
+    """Share of all Label mass found within `fraction` of the total effort (ADR 0018).
 
     `effort` maps a path to its cost: physical LOC for the co-primary metric, cyclomatic
     complexity for the sensitivity check. The budget is `fraction` of the sum over `effort`.

@@ -209,7 +209,7 @@ def test_dcg_rejects_a_non_positive_k() -> None:
         scoring.dcg_at_k([["a"]], Labels(counts={"a": 1}), 0)
 
 
-# Recall at a budget, precision@k, Spearman and the sensitivity gains (ADR 0017).
+# Recall at a budget, precision@k, Spearman and the sensitivity gains (ADR 0018).
 
 
 def _brute_force_recall(
