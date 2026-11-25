@@ -10,6 +10,7 @@ from tech_debt_miner.repo import github
 from tech_debt_miner.run import snapshot as snapshot_module
 from tech_debt_miner.run.artifacts import LABELS, RANKING, SNAPSHOT
 from tech_debt_miner.run.label import LabelDeps, WindowOpenError
+from tech_debt_miner.run.plan import PlanDeps
 from tech_debt_miner.run.run_dir import RunDir, RunState, Stage
 from tech_debt_miner.run.score import ScoreDeps
 from tech_debt_miner.run.snapshot import SnapshotDeps
@@ -46,7 +47,7 @@ def new_run(tmp_path: Path, repos_dir: Path) -> RunDir:
         target_repo="owner/target",
         pinned_sha=repo_git.resolve_pinned_sha(repos_dir / "target", CUTOFF),
         cutoff_date=CUTOFF.isoformat(),
-        model="m",
+        model="claude-sonnet-5-5",
         model_training_cutoff="2023-06-30",
         cutoff_minus_training_days=0,
         repeats=1,
@@ -65,6 +66,7 @@ def no_bugs(_repo: str) -> set[int]:
 def deps_for(repos_dir: Path, today: datetime = AFTER_WINDOW) -> StageDeps:
     return StageDeps(
         snapshot=SnapshotDeps(repos_dir=repos_dir, issues=None),
+        plan=PlanDeps(max_usd=4.0),
         label=LabelDeps(repos_dir=repos_dir, clock=lambda: today, update_clone=None),
         closed_bugs=no_bugs,
         score=ScoreDeps(clock=lambda: today),
@@ -82,7 +84,7 @@ def test_a_dry_run_is_a_planned_run_that_stops_after_snapshot(
 
     ran = resume(run_dir, deps_for(repos_dir), run=False)
 
-    assert ran == [Stage.SNAPSHOT]
+    assert ran == [Stage.SNAPSHOT, Stage.PLAN]
     assert run_dir.state() is RunState.PLANNED
     assert not run_dir.exists(RANKING, ("baseline", 0))
     assert not run_dir.exists(LABELS)
@@ -145,7 +147,7 @@ def test_a_stage_killed_midway_leaves_no_partial_artifact(
     assert run_dir.next_stage() is Stage.SNAPSHOT
 
     monkeypatch.undo()
-    assert resume(run_dir, deps_for(repos_dir), run=False) == [Stage.SNAPSHOT]
+    assert resume(run_dir, deps_for(repos_dir), run=False) == [Stage.SNAPSHOT, Stage.PLAN]
 
 
 def test_a_kill_during_the_final_rename_leaves_no_artifact(
@@ -163,7 +165,7 @@ def test_a_kill_during_the_final_rename_leaves_no_artifact(
 
     assert not run_dir.exists(SNAPSHOT)
     assert leftovers(run_dir) == []
-    assert resume(run_dir, deps_for(repos_dir), run=False) == [Stage.SNAPSHOT]
+    assert resume(run_dir, deps_for(repos_dir), run=False) == [Stage.SNAPSHOT, Stage.PLAN]
 
 
 def test_the_resume_command_plans_then_stops_at_the_open_label_window(
@@ -182,7 +184,7 @@ def test_the_resume_command_plans_then_stops_at_the_open_label_window(
     ]
 
     assert cli.main(common) == 0
-    assert capsys.readouterr().out.strip() == "ran: snapshot; state: planned"
+    assert capsys.readouterr().out.strip().endswith("ran: snapshot, plan; state: planned")
     # The suite's frozen clock is 2024-01-15, inside the Label window.
     assert cli.main([*common, "--run"]) == 1
     assert "the Label window closes after 2024-07-01" in capsys.readouterr().err

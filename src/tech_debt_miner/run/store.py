@@ -13,6 +13,7 @@ from tech_debt_miner.types import (
     CommitSubject,
     Cost,
     CostAttempt,
+    Estimate,
     FileFacts,
     Issue,
     Labels,
@@ -63,6 +64,10 @@ def snapshot_from_json(data: Mapping[str, Any]) -> Snapshot:
         excluded_issues=data.get("excluded_issues", 0),
         issues_collected=data.get("issues_collected", False),
     )
+
+
+def estimate_from_json(data: Mapping[str, Any]) -> Estimate:
+    return Estimate(**data)
 
 
 def request_from_json(data: Mapping[str, Any]) -> Request:

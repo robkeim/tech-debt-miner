@@ -254,7 +254,7 @@ class LLMClient:
         if price is None:
             msg = f"no price for model {request.model!r}; add it to PRICES"
             raise UnknownModelError(msg)
-        worst_case = _cost(
+        worst_case = cost_usd(
             price,
             (len(request.system) + len(request.prompt)) // CHARS_PER_TOKEN + 1,
             request.max_tokens,
@@ -283,7 +283,7 @@ class LLMClient:
             except LLMError as error:
                 self._record(request, attempt, error=redact(str(error), self._secrets))
                 raise
-            cost = _cost(price, response.input_tokens, response.output_tokens)
+            cost = cost_usd(price, response.input_tokens, response.output_tokens)
             self.spent_usd += cost
             self._record(request, attempt, response=response, cost=cost)
             if self._cache is not None:
@@ -348,5 +348,5 @@ class LLMClient:
         self._on_response(logged)
 
 
-def _cost(price: Price, input_tokens: int, output_tokens: int) -> float:
+def cost_usd(price: Price, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * price.input_per_mtok + output_tokens * price.output_per_mtok) / 1_000_000

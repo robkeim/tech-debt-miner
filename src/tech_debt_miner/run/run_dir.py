@@ -23,15 +23,16 @@ from tech_debt_miner.types import Manifest
 
 LLM = "llm"
 
-# The heuristic-only loop (M1): nothing writes `requests.jsonl` or LLM rankings yet, so a Run is
-# planned once `snapshot.json` exists and `rank` is done with the Baseline ranking alone. The
-# LLM rank stage (#89) sets this to True, which restores the full ADR 0008 rules.
+# Nothing writes LLM rankings yet, so `rank` is done with the Baseline ranking alone. The LLM rank
+# stage (#89) sets this to True, which restores the full ADR 0008 rule. A Run is already planned
+# only once `requests.jsonl` exists (the `plan` stage, ADR 0024).
 LLM_RANKING = False
 
 
 class Stage(StrEnum):
     RESOLVE = "resolve"
     SNAPSHOT = "snapshot"
+    PLAN = "plan"
     RANK = "rank"
     LABEL = "label"
     SCORE = "score"
@@ -167,7 +168,7 @@ class RunDir:
         return [pair for pair in wanted if not self.exists(RANKING, pair)]
 
     def _is_planned(self) -> bool:
-        return self.is_done(Stage.SNAPSHOT) and (not LLM_RANKING or self.exists(REQUESTS))
+        return self.is_done(Stage.SNAPSHOT) and self.is_done(Stage.PLAN)
 
     def is_done(self, stage: Stage) -> bool:
         """Return whether the stage's final artifact exists."""
@@ -176,6 +177,8 @@ class RunDir:
                 return self.exists(MANIFEST)
             case Stage.SNAPSHOT:
                 return self.exists(SNAPSHOT)
+            case Stage.PLAN:
+                return self.exists(REQUESTS)
             case Stage.RANK:
                 return not self.missing_rankings()
             case Stage.LABEL:

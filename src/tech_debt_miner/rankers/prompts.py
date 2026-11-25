@@ -19,6 +19,9 @@ RANK_TEMPLATE = "rank"
 TRIAGE_SET_SIZE = 100  # the Triage set holds `min(TRIAGE_SET_SIZE, eligible files)`
 RANKING_SIZE = 50  # the most files stage 2 returns
 DIGEST_MAX_SUBJECTS = 5
+SYSTEM = "You answer with JSON only."  # the system prompt of both stages
+TRIAGE_MAX_TOKENS = 4_000  # ADR 0010: stage 1 may emit up to 4k tokens
+RANK_MAX_TOKENS = 8_000  # and stage 2 up to 8k, plus whatever thinking needs
 # Conservative: real code averages nearer 4 characters a token (ADR 0023).
 CHARS_PER_TOKEN = 3
 # What the stage 1 digest may use. Sonnet 5.5 reads 1M tokens; the rest is for the template, the
@@ -125,3 +128,13 @@ def build_rank_prompt(snapshot: Snapshot, triage_set: Collection[str]) -> str:
         limit=RANKING_SIZE,
         files="\n\n".join(_code_block(file) for file in files),
     )
+
+
+def largest_triage_set(snapshot: Snapshot) -> tuple[str, ...]:
+    """Return the paths of the Triage-set-sized group of files with the biggest stage 2 blocks.
+
+    Stage 2's prompt depends on the model's stage 1 choice, so a Dry-run cannot build it. This is
+    the stand-in: the largest prompt any choice could make, so an estimate from it is a ceiling.
+    """
+    ranked = sorted(snapshot.files, key=lambda file: (-len(_code_block(file)), file.path))
+    return tuple(file.path for file in ranked[: triage_set_size(len(ranked))])
