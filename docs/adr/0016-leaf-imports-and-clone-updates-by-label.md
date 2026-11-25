@@ -24,3 +24,7 @@ Accepted. Decided in #72. Relaxes two rules of [ADR 0009](0009-code-layout-and-c
 - **Move `CommitChange`, `FileChange` and `is_eligible` into `types.py`.** It keeps the rule literal and scatters the repo reading code.
 - **Never update the clone; tell people to pull.** The Label then depends on a manual step that nothing checks.
 - **A plain `git pull`.** It can create merge commits or rewrite the working tree when upstream diverged, so a rewritten history would pass silently.
+
+## Amendments
+
+- 2026-11-24: `validate` (#79) also fast-forwards the clone, through the same `read_window` as `label` and with the same `--no-fetch` escape, so N is computed from the commits the Label will count. "Only `label` updates a clone" now reads "only `label` and `validate`".

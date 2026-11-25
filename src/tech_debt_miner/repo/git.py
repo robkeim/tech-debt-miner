@@ -92,6 +92,11 @@ def list_commits(repo: Path, since: date, until: date, rev: str = "HEAD") -> lis
     return commits_in_range(parse_commit_log(out), since, until)
 
 
+def diff_stat(repo: Path, sha: str) -> str:
+    """Return the `--stat` summary of commit `sha`, without its message."""
+    return _git("show", "--stat=120", "--format=", "-M", sha, cwd=repo).decode().strip()
+
+
 def fast_forward(repo: Path) -> None:
     """Fetch the clone's upstream and fast-forward to it, or raise GitError if it cannot."""
     _git("fetch", "--quiet", cwd=repo)

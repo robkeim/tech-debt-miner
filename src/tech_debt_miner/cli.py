@@ -1,4 +1,7 @@
-"""The command line: `resolve`, `snapshot`, `rank`, `label`, `probe`, `status` (ADR 0009)."""
+"""The command line: `resolve`, `snapshot`, `rank`, `label`, `validate`, `probe`, `status`.
+
+See ADR 0009.
+"""
 
 import argparse
 import os
@@ -19,13 +22,20 @@ from tech_debt_miner.llm.client import (
     load_api_key,
 )
 from tech_debt_miner.repo import git, github
-from tech_debt_miner.run.artifacts import RESPONSES, SNAPSHOT
-from tech_debt_miner.run.label import CloneUpdateError, LabelDeps, WindowOpenError, label
+from tech_debt_miner.run.artifacts import MANIFEST, RESPONSES, SNAPSHOT
+from tech_debt_miner.run.label import (
+    CapMismatchError,
+    CloneUpdateError,
+    LabelDeps,
+    WindowOpenError,
+    label,
+)
 from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
+from tech_debt_miner.run.validate import render, validate
 
 DEFAULT_MODEL = "claude-sonnet-5-5"
 DEFAULT_TRAINING_CUTOFF = date(2026, 6, 30)  # K, June 30 2026 (ADR 0006)
@@ -59,6 +69,16 @@ def _parser() -> argparse.ArgumentParser:
     label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
+    validate_cmd = commands.add_parser(
+        "validate", help="compute the fix-size cap N and print the review sheet"
+    )
+    validate_cmd.add_argument("run_id")
+    validate_cmd.add_argument(
+        "--no-fetch", action="store_true", help="skip fast-forwarding the clone (offline use)"
+    )
+    validate_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
+    validate_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
     snapshot_cmd = commands.add_parser("snapshot", help="write snapshot.json for a Run")
     snapshot_cmd.add_argument("run_id")
     snapshot_cmd.add_argument(
@@ -87,17 +107,15 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if args.command == "resolve":
-        return _resolve(args)
-    if args.command == "label":
-        return _label(args)
-    if args.command == "snapshot":
-        return _snapshot(args)
-    if args.command == "probe":
-        return _probe(args)
-    if args.command == "rank":
-        return _rank(args)
-    return _status(args)
+    handlers = {
+        "resolve": _resolve,
+        "snapshot": _snapshot,
+        "rank": _rank,
+        "label": _label,
+        "validate": _validate,
+        "probe": _probe,
+    }
+    return handlers.get(args.command, _status)(args)
 
 
 def _resolve(args: argparse.Namespace) -> int:
@@ -163,9 +181,29 @@ def _label(args: argparse.Namespace) -> int:
     )
     try:
         label(run_dir, deps)
-    except (WindowOpenError, CloneUpdateError) as error:
+    except (WindowOpenError, CloneUpdateError, CapMismatchError) as error:
         print(error, file=sys.stderr)
         return 1
+    return 0
+
+
+def _validate(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    deps = LabelDeps(
+        repos_dir=args.repos_dir,
+        clock=lambda: datetime.now(UTC),
+        update_clone=None if args.no_fetch else git.fast_forward,
+    )
+    try:
+        result = validate(run_dir, deps)
+    except (WindowOpenError, CloneUpdateError, FileExistsError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    print(render(run_dir.read(MANIFEST), result), end="")
     return 0
 
 

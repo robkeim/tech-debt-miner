@@ -47,6 +47,18 @@ _Avoid_: Bug commit, fixing commit
 The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date, counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
+**Fix size**:
+The number of Eligible files a Fix commit touches, counted only for Fix commits that touch at least one. Computed on the keyword-only set, from sizes alone and never from Labels or scores.
+_Avoid_: Commit size, diff size
+
+**Fix-size cap N**:
+The 90th percentile (nearest rank) of Fix sizes in the closed Label window of a Target repo. A Fix commit touching more than N Eligible files is dropped ([ADR 0004](docs/adr/0004-label-is-future-fix-proneness.md)). `validate` computes it once per Run, and it is fixed before any scored Run. The Label is also reported at N = 5, 10, 20 and uncapped.
+_Avoid_: Threshold, max files (the CLI flag is `--max-files`)
+
+**Review sheet**:
+The `validate` output for the ADR 0004 smoke test: a random sample of 30 Fix commits that count under N, drawn with the fixed seed in `labels.py` from the pool ordered by SHA. Each row shows the message, the issue references found in it (candidates, not tracker-confirmed), the Eligible files and the diff stat. A pool smaller than 30 is shown whole.
+_Avoid_: Validation set, audit sample
+
 **Baseline**:
 The churn × complexity ranker the LLM is compared against, defined by [ADR 0007](docs/adr/0007-heuristic-baseline-definition.md).
 _Avoid_: Heuristic (as a noun), control
