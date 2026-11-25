@@ -288,3 +288,13 @@ def test_checks_use_headline_repos_only() -> None:
     got = checks_by_name([exploratory, *headline])["k = 5"]
     assert got.repos == 5
     assert got.mean_diff == pytest.approx(0.1)
+
+
+def test_every_check_metric_is_written_by_the_scorer() -> None:
+    from tech_debt_miner import labels  # noqa: PLC0415 - only this guard needs it
+
+    variants = {labels.variant_name(cap): {"a.py": 1} for cap in labels.CAP_GRID}
+    variants |= {name: {"a.py": 1} for name, _ in labels.WINDOW_VARIANTS}
+    full = Labels(counts={"a.py": 1}, keyword_counts={"a.py": 1}, variants=variants)
+    written = scoring.score_ranking([("a.py",)], full, {"a.py": 1}, {"a.py": 1}).metrics
+    assert {c.metric for c in report.CHECKS} <= set(written)
