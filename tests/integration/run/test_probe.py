@@ -182,6 +182,13 @@ def test_cli_probe_reports_a_second_probe_as_an_error(
     assert "already exists" in capsys.readouterr().err
 
 
+def test_cli_probe_of_an_unknown_run_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert cli.main(["probe", "nope", "--runs-dir", str(tmp_path)]) == 2
+    assert "no such Run" in capsys.readouterr().err
+
+
 def test_cli_probe_refuses_a_resume_whose_cap_is_already_spent(
     run_dir: RunDir,
     capsys: pytest.CaptureFixture[str],
