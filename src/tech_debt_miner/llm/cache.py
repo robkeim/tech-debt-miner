@@ -39,9 +39,9 @@ def cache_key(
 class ResponseCache:
     """One JSON file per entry under `root`, written atomically."""
 
-    def __init__(self, root: Path, settings: Mapping[str, str] | None = None) -> None:
+    def __init__(self, root: Path, settings: Mapping[str, str]) -> None:
         self._root = root
-        self._settings = dict(settings or {})  # the transport's `settings`; part of every key
+        self._settings = dict(settings)  # the transport's `settings`; part of every key
 
     def get(self, request: Request, schema: Mapping[str, object] | None = None) -> Response | None:
         path = self._path(cache_key(request, schema, self._settings))

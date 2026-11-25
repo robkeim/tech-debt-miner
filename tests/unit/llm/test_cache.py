@@ -85,7 +85,7 @@ def test_key_ignores_schema_key_order(schema: dict[str, int]) -> None:
 
 
 def test_put_then_get_round_trips(tmp_path: Path) -> None:
-    cache = ResponseCache(tmp_path / "responses")
+    cache = ResponseCache(tmp_path / "responses", {})
     request = Request("llm", 0, 0, "m1", "s", "p", 10)
     assert cache.get(request) is None
     cache.put(request, RESPONSE)
@@ -94,7 +94,7 @@ def test_put_then_get_round_trips(tmp_path: Path) -> None:
 
 
 def test_a_corrupt_entry_is_a_miss_and_is_replaced(tmp_path: Path) -> None:
-    cache = ResponseCache(tmp_path)
+    cache = ResponseCache(tmp_path, {})
     request = Request("llm", 0, 0, "m1", "s", "p", 10)
     cache.put(request, RESPONSE)
     (entry,) = tmp_path.glob("*/*.json")

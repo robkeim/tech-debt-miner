@@ -34,4 +34,4 @@ Accepted. Decided in #83. It fills in the cache layers of [ADR 0008](0008-pipeli
 
 ## Amendments
 
-- 2026-11-25: The key now also covers the transport's thinking and effort settings ([#119](https://github.com/robkeim/tech-debt-miner/issues/119)), which closes the first "Known limits" item. `AnthropicTransport.settings` supplies them, `ResponseCache(root, settings)` holds them, and `cache_key` hashes them under `settings`. `ranker` stays out. Entries written before this change are orphaned, as the "key is not versioned" limit already says.
+- 2026-11-25: The key now also covers the transport's thinking and effort settings ([#119](https://github.com/robkeim/tech-debt-miner/issues/119)), which closes the first "Known limits" item. `AnthropicTransport.settings` supplies them, `ResponseCache(root, settings)` holds them (required, so a missing argument is a type error), and `cache_key` hashes them under `settings`. `ranker` stays out. Entries written before this change are orphaned, as the "key is not versioned" limit already says.
