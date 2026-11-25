@@ -82,7 +82,8 @@ def test_rank_writes_only_the_baseline_ranking(tmp_path: Path) -> None:
 def test_rank_leaves_the_run_ranked_until_llm_rankings_exist(tmp_path: Path) -> None:
     run_dir = new_run(tmp_path)
     run_dir.write(SNAPSHOT, SNAPSHOT_VALUE)
-    run_dir.append(REQUESTS, Request("llm", 0, 0, "model-1", "s", "p", 10))
+    for repeat in range(2):
+        run_dir.append(REQUESTS, Request("llm", repeat, 0, "model-1", "s", "p", 10))
 
     rank(run_dir)
 

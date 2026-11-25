@@ -122,7 +122,7 @@ def test_render_shows_per_stage_tokens_and_the_cost_against_the_cap(tmp_path: Pa
 
     assert "stage 1 (triage)" in text
     assert "stage 2 (rank)" in text
-    assert "of the $4.00 cap" in text
+    assert "of the $4 cap" in text
 
 
 def test_the_resume_command_prints_the_estimate_and_needs_no_key(
@@ -148,7 +148,7 @@ def test_the_resume_command_refuses_an_estimate_over_the_cap(
     assert code == 1
     captured = capsys.readouterr()
     assert "estimated cost for 3 repeats" in captured.out
-    assert "exceeds the $0.00 cap" in captured.err
+    assert "exceeds the $0.0001 cap" in captured.err
     assert run_dir.state() is RunState.RESOLVED
 
 
@@ -160,3 +160,20 @@ def test_the_resume_command_reports_an_overflowing_repo_as_excluded(
     assert cli.main(["resume", run_dir.id, "--runs-dir", str(tmp_path)]) == 1
     assert "excluded: owner/repo:" in capsys.readouterr().err
     assert run_dir.read(MANIFEST).target_repo == "owner/repo"
+
+
+def test_a_plan_interrupted_between_requests_is_not_done_and_resumes_cleanly(
+    tmp_path: Path,
+) -> None:
+    run_dir = new_run(tmp_path, file("a.py"))
+    plan(run_dir, PlanDeps(max_usd=4.0))
+    rows = run_dir.read_all(REQUESTS)
+    (run_dir.path / "requests.jsonl").write_text(
+        (run_dir.path / "requests.jsonl").read_text().splitlines()[0] + "\n"
+    )
+    assert run_dir.state() is RunState.RESOLVED
+
+    plan(run_dir, PlanDeps(max_usd=4.0))
+
+    assert sorted(r.repeat for r in run_dir.read_all(REQUESTS)) == [r.repeat for r in rows]
+    assert run_dir.state() is RunState.PLANNED

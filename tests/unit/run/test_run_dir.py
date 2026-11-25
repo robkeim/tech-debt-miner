@@ -255,6 +255,7 @@ def test_a_run_is_planned_once_it_has_a_snapshot_and_requests(tmp_path: Path) ->
     assert run.state() is RunState.RESOLVED
     assert run.next_stage() is Stage.PLAN
     run.append(REQUESTS, REQUEST)
+    run.append(REQUESTS, replace(REQUEST, repeat=1))
     assert run.state() is RunState.PLANNED
     assert run.next_stage() is Stage.RANK
 
@@ -264,6 +265,7 @@ def test_rank_resumes_per_ranking(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
     run.append(REQUESTS, REQUEST)
+    run.append(REQUESTS, replace(REQUEST, repeat=1))
     assert run.missing_rankings() == [("baseline", 0), ("llm", 0), ("llm", 1)]
     run.write(RANKING, Ranking("baseline", 0, ()))
     run.write(RANKING, Ranking("llm", 0, ()))
@@ -278,6 +280,7 @@ def test_a_ranked_run_resumes_at_label_then_score(tmp_path: Path) -> None:
     run = make_run(tmp_path)
     run.write(SNAPSHOT, SNAPSHOT_VALUE)
     run.append(REQUESTS, REQUEST)
+    run.append(REQUESTS, replace(REQUEST, repeat=1))
     run.write(RANKING, Ranking("baseline", 0, ()))
     assert run.state() is RunState.RANKED
     assert run.next_stage() is Stage.LABEL

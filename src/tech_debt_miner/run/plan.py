@@ -70,11 +70,15 @@ def plan(run_dir: RunDir, deps: PlanDeps) -> Estimate:
     run_dir.write(ESTIMATE, estimate)
     if estimate.total_usd > deps.max_usd:
         msg = (
-            f"estimated ${estimate.total_usd:.2f} exceeds the ${deps.max_usd:.2f} cap; "
+            f"estimated ${estimate.total_usd:.2f} exceeds the ${deps.max_usd:g} cap; "
             "raise it with --max-usd"
         )
         raise EstimateExceedsCapError(msg)
-    for repeat in range(manifest.repeats):
+    # A crash can leave some rows; the plan is done only when every repeat has one.
+    written: set[int] = set()
+    if run_dir.exists(REQUESTS):
+        written = {row.repeat for row in run_dir.read_all(REQUESTS)}
+    for repeat in sorted(set(range(manifest.repeats)) - written):
         run_dir.append(
             REQUESTS,
             Request(
@@ -98,5 +102,5 @@ def render(estimate: Estimate, max_usd: float) -> str:
         f"stage 2 (rank):   ~{estimate.rank_input_tokens:,} input tokens (worst case), "
         f"up to {estimate.rank_output_tokens:,} output, per repeat\n"
         f"estimated cost for {estimate.repeats} repeats: ${estimate.total_usd:.2f} "
-        f"of the ${max_usd:.2f} cap\n"
+        f"of the ${max_usd:g} cap\n"
     )

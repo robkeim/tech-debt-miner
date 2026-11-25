@@ -178,7 +178,9 @@ class RunDir:
             case Stage.SNAPSHOT:
                 return self.exists(SNAPSHOT)
             case Stage.PLAN:
-                return self.exists(REQUESTS)
+                return self.exists(REQUESTS) and len(self.read_all(REQUESTS)) >= (
+                    self.read(MANIFEST).repeats
+                )
             case Stage.RANK:
                 return not self.missing_rankings()
             case Stage.LABEL:
