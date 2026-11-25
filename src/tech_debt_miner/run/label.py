@@ -51,7 +51,7 @@ class LabelWindow:
     clone: Path
     commits: list[CommitChange]
     cutoff_files: list[str]  # every path in the tree at the Pinned SHA
-    later_commits: list[CommitChange]  # after the 6-month window, up to 12 months; empty if open
+    later_commits: list[CommitChange]  # after the 6-month window, up to 12 months
     long_window_closed: bool  # the 12-month window has closed, so an empty `later_commits` is real
 
 
@@ -79,18 +79,18 @@ def read_window(run_dir: RunDir, deps: LabelDeps) -> LabelWindow:
     commits = git.list_commits(
         clone, labels.window_start(cutoff), labels.window_end(cutoff) + timedelta(days=1)
     )
-    long_closed = labels.window_is_closed(cutoff, today, labels.LONG_WINDOW_MONTHS)
+    long_window_closed = labels.window_is_closed(cutoff, today, labels.LONG_WINDOW_MONTHS)
     later = (
         git.list_commits(
             clone,
             labels.window_end(cutoff) + timedelta(days=1),
             labels.window_end(cutoff, labels.LONG_WINDOW_MONTHS) + timedelta(days=1),
         )
-        if long_closed
+        if long_window_closed
         else []
     )
     return LabelWindow(
-        clone, commits, git.list_files(clone, manifest.pinned_sha), later, long_closed
+        clone, commits, git.list_files(clone, manifest.pinned_sha), later, long_window_closed
     )
 
 
