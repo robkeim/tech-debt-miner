@@ -95,7 +95,7 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 - **Tiers:** every test carries one marker, enforced by a conftest hook and `--strict-markers`. Tests live under the matching directory, mirroring `src/tech_debt_miner/`.
   - `unit` (`tests/unit/`): pure and in-memory.
   - `integration` (`tests/integration/`): tiny fixture repo, real git, fake LLM, including the Dry-run end-to-end test.
-  - `policy` (`tests/policy/`): architecture rules such as "only the client imports the SDK" (ADR 0002) and the Leakage test.
+  - `policy` (`tests/policy/`): architecture rules such as "only the client imports the SDK" (ADR 0002), "ADR numbers are unique and contiguous", and the Leakage test.
 - **No network:** `pytest-socket` blocks all sockets in every test, with no localhost exception and no opt-out marker until a test truly needs one.
 - **LLM in tests:** a hand-written fake client for logic, plus a few committed recorded responses for parse and Replay fidelity. Recordings come from a manual script with the real key, never CI. A test fails if a recording lacks its Manifest metadata (model snapshot, request ID).
 - **Leakage test:** a fixture repo with commits before and after a Cutoff date; post-cutoff commits carry a poison marker. It runs through the Dry-run path and asserts the marker never appears in any prompt, feature, or churn and complexity input. It also checks it fails when the cutoff filter is disabled.
@@ -114,7 +114,7 @@ Runs with `pytest`; config lives in `pyproject.toml`. Rationale for the network 
 
 | Mode | Where it runs | What it runs |
 | --- | --- | --- |
-| `uv run gate --fast` | `pre-commit` hook | `ruff format --check`, `ruff check`, `pyright` (whole project); `cspell` on staged files; `actionlint` and `zizmor` only when workflow files are staged |
+| `uv run gate --fast` | `pre-commit` hook | `ruff format --check`, `ruff check`, `pyright` (whole project); the ADR numbering test; `cspell` on staged files; `actionlint` and `zizmor` only when workflow files are staged |
 | `uv run gate` | `pre-push` hook, CI | Everything in fast, plus `pytest` with coverage, `diff-cover`, full `cspell`, `lychee` |
 | `uv run gate commit-msg <file>` | `commit-msg` hook | Commit message rules from [Commits and PRs](#commits-and-prs) |
 | `uv run gate pr-title` | CI | The same function, applied to the PR title |

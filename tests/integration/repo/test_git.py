@@ -181,6 +181,39 @@ def test_last_commit_touching_an_unknown_path_fails(repo: Path) -> None:
         repo_git.last_commit_touching(repo, "nope.py")
 
 
+def test_list_commits_reads_author_and_full_message(repo: Path) -> None:
+    git(
+        repo,
+        "commit",
+        "--quiet",
+        "--allow-empty",
+        "--message",
+        "subject line",
+        "--message",
+        "body line",
+        env={
+            "GIT_AUTHOR_NAME": "Some Bot[bot]",
+            "GIT_AUTHOR_EMAIL": "bot@example.com",
+            "GIT_COMMITTER_DATE": at(2024, 5, 1).isoformat(),
+        },
+    )
+    newest = repo_git.list_commits(repo, date(2024, 4, 1), date(2024, 6, 1))[0]
+    assert newest.author_name == "Some Bot[bot]"
+    assert newest.author_email == "bot@example.com"
+    assert newest.message == "subject line\n\nbody line"
+
+
+def test_list_commits_marks_deleted_files(repo: Path) -> None:
+    (repo / "a.py").unlink()
+    git(repo, "commit", "--quiet", "--all", "--message", "drop a")
+    drop = repo_git.list_commits(repo, date(2020, 1, 1), date(2100, 1, 1))[0]
+    assert drop.files == (FileChange("a.py", deleted=True),)
+
+
+def test_list_files_returns_the_tree_at_a_sha(repo: Path) -> None:
+    assert sorted(repo_git.list_files(repo, shas(repo)[3])) == ["a.py", "new.py"]
+
+
 def test_list_commits_from_a_rev_skips_commits_that_are_not_its_ancestors(repo: Path) -> None:
     first, second = shas(repo)[:2]
 

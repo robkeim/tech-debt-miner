@@ -5,6 +5,7 @@ import pytest
 from tech_debt_miner.repo.cutoff import commits_in_range, pick_pinned_sha
 from tech_debt_miner.repo.history import (
     CommitChange,
+    FileChange,
     GitError,
     LogEntry,
     parse_commit_log,
@@ -62,8 +63,14 @@ def test_parse_graph_log_reads_parents() -> None:
     assert parse_graph_log("m 5 a s\na 4\n") == [LogEntry("m", 5, ("a", "s")), LogEntry("a", 4, ())]
 
 
-def test_parse_commit_log_reads_renames() -> None:
-    out = "\0c1 100\n\nM\tx.py\n\0c2 50\n\nR100\told.py\tnew.py\n"
+def test_parse_commit_log_reads_renames_deletes_author_and_message() -> None:
+    out = (
+        "\0c1\x01100\x01Ann\x01ann@x.io\x01fix it\n\nbody\n\x01\n\nM\tx.py\n"
+        "\0c2\x0150\x01n\x01e\x01m\x01\n\nR100\told.py\tnew.py\nD\tgone.py\n"
+    )
     first, second = parse_commit_log(out)
     assert first.files[0].path == "x.py"
+    assert (first.author_name, first.author_email) == ("Ann", "ann@x.io")
+    assert first.message == "fix it\n\nbody"
     assert (second.files[0].path, second.files[0].old_path) == ("new.py", "old.py")
+    assert second.files[1] == FileChange("gone.py", deleted=True)

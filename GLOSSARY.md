@@ -25,11 +25,11 @@ The past date a Target repo is rewound to; only history before it is visible to 
 _Avoid_: As-of date, rewind date
 
 **Replay**:
-Re-scoring a Run from its logged LLM responses without calling the LLM again.
+Re-scoring a Run from its logged LLM responses (`responses.jsonl`) without calling the LLM again, and without the Response cache or the Target repo.
 _Avoid_: Rerun (a rerun calls the LLM again)
 
 **Response cache**:
-A local store of LLM responses keyed by the exact request, so identical requests are never paid for twice.
+A local store of LLM responses keyed by the exact request, repeat index and attempt index ([ADR 0017](docs/adr/0017-response-cache-key-response-log-and-replay.md)), so identical requests are never paid for twice. Every reply, cache hit or not, is also copied into the Run's `responses.jsonl`.
 _Avoid_: Prompt cache (that is the provider's feature)
 
 **Dry-run**:
@@ -44,7 +44,7 @@ A commit on the Target repo's default branch that is identified as a bug fix by 
 _Avoid_: Bug commit, fixing commit
 
 **Label**:
-The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date.
+The per-file ground truth: the number of distinct Fix commits touching the file after the Cutoff date, counted over the window `(Cutoff date, Cutoff date + 6 months]` by date. The Cutoff day itself is in neither the visible history nor the Label window.
 _Avoid_: Ground truth (as a noun for one file's value), tag
 
 **Baseline**:
@@ -74,3 +74,11 @@ _Avoid_: Completion, message (that is the SDK's type)
 **Snapshot**:
 The `snapshot.json` artifact: each Eligible file's lines of code, Churn and complexity as of the Cutoff date, plus the count of files whose complexity is 0 because they have no functions or `lizard` could not analyze them. Churn counts only commits that are ancestors of the Pinned SHA, so it covers exactly the tree the complexity comes from.
 _Avoid_: Facts, features
+
+**Tie group**:
+Files a ranker ranks equally. Scoring averages every metric over all orderings of each tie group, never by path name ([ADR 0005](docs/adr/0005-scoring-pre-registration.md)).
+_Avoid_: Bucket, tied set
+
+**Effort map**:
+The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0018](docs/adr/0018-recall-budget-and-effort-map.md)).
+_Avoid_: LOC map, size map
