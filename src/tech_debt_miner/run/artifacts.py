@@ -19,7 +19,7 @@ from tech_debt_miner.types import (
     Probe,
     Ranking,
     Request,
-    Scores,
+    RunScores,
     Snapshot,
     Validation,
 )
@@ -92,10 +92,24 @@ PROBE = Artifact[Probe, None](
 )
 
 
+def ranking_name(ranker: str, repeat: int) -> str:
+    """Return the name a ranking goes by in file names and scores: `baseline` or `llm-<n>`."""
+    return ranker if ranker == BASELINE else f"{ranker}-{repeat}"
+
+
 def _ranking_path(key: tuple[str, int]) -> str:
-    ranker, repeat = key
-    name = ranker if ranker == BASELINE else f"{ranker}-{repeat}"
-    return f"rankings/{name}.json"
+    return f"rankings/{ranking_name(*key)}.json"
+
+
+def _parse_ranking_key(file_name: str) -> tuple[str, int]:
+    stem = file_name.removesuffix(".json")
+    ranker, _, repeat = stem.partition("-")
+    if stem == BASELINE:
+        return (BASELINE, 0)
+    if ranker.isalpha() and ranker != BASELINE and repeat.isdecimal():
+        return (ranker, int(repeat))
+    msg = f"unexpected ranking file {file_name!r}; expected baseline.json or <ranker>-<n>.json"
+    raise ValueError(msg)
 
 
 RANKING = Artifact[Ranking, tuple[str, int]](
@@ -106,11 +120,13 @@ RANKING = Artifact[Ranking, tuple[str, int]](
     Policy.REPLACE,
     keyed=True,
     key_of=lambda ranking: (ranking.ranker, ranking.repeat),
+    glob="rankings/*.json",
+    parse_key=_parse_ranking_key,
 )
 
 _SCORES_PREFIX, _SCORES_SUFFIX = "scores-", ".json"
 
-SCORES = Artifact[Scores, str](
+SCORES = Artifact[RunScores, str](
     "scores",
     lambda scoring_date: f"{_SCORES_PREFIX}{scoring_date}{_SCORES_SUFFIX}",
     store.to_json,

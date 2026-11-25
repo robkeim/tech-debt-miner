@@ -102,3 +102,7 @@ _Avoid_: Bucket, tied set
 **Effort map**:
 The path-to-cost map recall at 20% of LOC is measured against: physical LOC of every eligible file at the Pinned SHA, or cyclomatic complexity for the sensitivity check ([ADR 0018](docs/adr/0018-recall-budget-and-effort-map.md)).
 _Avoid_: LOC map, size map
+
+**Excluded Run**:
+A Run with fewer than 10 files at Label 1 or more. `score` still writes its `scores-<scoring-date>.json`, with the reason and count and no metrics, so `report` counts it instead of dropping it ([ADR 0005](docs/adr/0005-scoring-pre-registration.md), [ADR 0008](docs/adr/0008-pipeline-stages-artifacts-and-resume.md)).
+_Avoid_: Skipped Run, dropped Run

@@ -1,4 +1,4 @@
-"""The command line: `resolve`, `snapshot`, `rank`, `label`, `validate`, `probe`, `status`.
+"""The command line: the five stages, `validate`, `probe` and `status`.
 
 See ADR 0009.
 """
@@ -34,6 +34,7 @@ from tech_debt_miner.run.probe import NoProbeCommitError, ProbeDeps, run_probe
 from tech_debt_miner.run.rank import rank
 from tech_debt_miner.run.resolve import ResolveDeps, ResolveInputs, resolve
 from tech_debt_miner.run.run_dir import RunDir, RunNotFoundError
+from tech_debt_miner.run.score import LabelMissingError, NoRankingsError, ScoreDeps, score
 from tech_debt_miner.run.snapshot import SnapshotDeps, snapshot
 from tech_debt_miner.run.validate import render, validate
 
@@ -68,6 +69,10 @@ def _parser() -> argparse.ArgumentParser:
     )
     label_cmd.add_argument("--repos-dir", type=Path, default=Path("repos"))
     label_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
+
+    score_cmd = commands.add_parser("score", help="write scores-<today>.json for a Run")
+    score_cmd.add_argument("run_id")
+    score_cmd.add_argument("--runs-dir", type=Path, default=Path("runs"))
 
     validate_cmd = commands.add_parser(
         "validate", help="compute the fix-size cap N and print the review sheet"
@@ -113,9 +118,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         "rank": _rank,
         "label": _label,
         "validate": _validate,
+        "score": _score,
         "probe": _probe,
+        "status": _status,
     }
-    return handlers.get(args.command, _status)(args)
+    return handlers[args.command](args)
 
 
 def _resolve(args: argparse.Namespace) -> int:
@@ -204,6 +211,22 @@ def _validate(args: argparse.Namespace) -> int:
         print(error, file=sys.stderr)
         return 1
     print(render(run_dir.read(MANIFEST), result), end="")
+    return 0
+
+
+def _score(args: argparse.Namespace) -> int:
+    try:
+        run_dir = RunDir.open(args.runs_dir, args.run_id)
+    except RunNotFoundError as error:
+        print(error, file=sys.stderr)
+        return 2
+    try:
+        result = score(run_dir, ScoreDeps(clock=lambda: datetime.now(UTC)))
+    except (LabelMissingError, NoRankingsError, FileExistsError) as error:
+        print(error, file=sys.stderr)
+        return 1
+    if result.excluded:
+        print(f"excluded: {result.excluded}")
     return 0
 
 
