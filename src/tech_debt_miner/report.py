@@ -10,7 +10,7 @@ import random
 import re
 import statistics
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from tech_debt_miner.types import BASELINE, RunScores
@@ -23,6 +23,32 @@ PRIMARY_SCORING_DATE = "2027-01-31"  # earliest scoring on or after this is prim
 RESAMPLES = 10_000
 SEED = 20_270_131  # fixed so the same score files always give the same CI (ADR 0020)
 CONFIDENCE = 0.95
+
+
+@dataclass(frozen=True)
+class Check:
+    """One ADR 0005 sensitivity check: a metric and the primary metric it is compared with."""
+
+    name: str
+    metric: str
+    against: str  # the primary metric whose direction this check is compared with
+
+
+CHECKS = (
+    Check("Binary gain", f"{NDCG_METRIC}:binary", NDCG_METRIC),
+    Check("Raw-Label gain", f"{NDCG_METRIC}:raw", NDCG_METRIC),
+    Check("3-month window", f"{NDCG_METRIC}[window-3m]", NDCG_METRIC),
+    Check("12-month window", f"{NDCG_METRIC}[window-12m]", NDCG_METRIC),
+    Check("Cyclomatic complexity as effort", "recall@20%cc", RECALL_METRIC),
+    Check("k = 5", "ndcg@5", NDCG_METRIC),
+    Check("k = 10", "ndcg@10", NDCG_METRIC),
+    Check("k = 50", "ndcg@50", NDCG_METRIC),
+    Check("Keyword-only Fix commits", f"{NDCG_METRIC}[keyword]", NDCG_METRIC),
+    Check("Fix-size cap N = 5", f"{NDCG_METRIC}[cap-5]", NDCG_METRIC),
+    Check("Fix-size cap N = 10", f"{NDCG_METRIC}[cap-10]", NDCG_METRIC),
+    Check("Fix-size cap N = 20", f"{NDCG_METRIC}[cap-20]", NDCG_METRIC),
+    Check("Fix-size cap uncapped", f"{NDCG_METRIC}[cap-none]", NDCG_METRIC),
+)
 
 
 class Outcome(StrEnum):
@@ -81,6 +107,17 @@ class RepoDiff:
 
 
 @dataclass(frozen=True)
+class CheckResult:
+    """A sensitivity check over the headline repos at the primary scoring; never sets a verdict."""
+
+    check: Check
+    mean_diff: float | None  # None when no headline repo has the metric
+    repos: int  # headline repos that have it
+    missing: int  # headline repos that do not, e.g. a window that was still open at `label`
+    flipped: bool  # its sign is opposite to the primary's for the same metric
+
+
+@dataclass(frozen=True)
 class Analysis:
     windows: tuple[WindowResult, ...]  # every scored window, exploratory ones included
     left_out: tuple[LeftOut, ...]
@@ -89,6 +126,7 @@ class Analysis:
     ci: tuple[float, float] | None
     mean_recall_diff: float | None
     outcome: Outcome | None  # None below the evidence floor
+    checks: tuple[CheckResult, ...] = ()
 
     @property
     def direction(self) -> int:
@@ -156,7 +194,9 @@ def _is_ranking_of(name: str, ranker: str) -> bool:
 
 def _mean_metric(scores: RunScores, ranker: str, metric: str) -> float | None:
     values = [
-        s.metrics[metric] for name, s in scores.rankings.items() if _is_ranking_of(name, ranker)
+        s.metrics[metric]
+        for name, s in scores.rankings.items()
+        if _is_ranking_of(name, ranker) and metric in s.metrics
     ]
     return statistics.fmean(values) if values else None
 
@@ -224,6 +264,41 @@ def _repo_diffs(windows: Sequence[WindowResult]) -> tuple[RepoDiff, ...]:
     )
 
 
+def _check_result(
+    runs: Sequence[RunScorings], pair: tuple[str, str], check: Check, primary_diff: float
+) -> CheckResult:
+    treatment, control = pair
+    by_repo: dict[str, list[float]] = {}
+    missing: set[str] = set()
+    for run in runs:
+        scoring_date = _choose_scoring(run.scorings, latest=False)
+        if scoring_date is None or not run.post_training or run.scorings[scoring_date].excluded:
+            continue
+        scores = run.scorings[scoring_date]
+        treated = _mean_metric(scores, treatment, check.metric)
+        base = _mean_metric(scores, control, check.metric)
+        if treated is None or base is None:
+            missing.add(run.repo)
+        else:
+            by_repo.setdefault(run.repo, []).append(treated - base)
+    diffs = [statistics.fmean(group) for group in by_repo.values()]
+    mean = statistics.fmean(diffs) if diffs else None
+    flipped = mean is not None and _sign(mean) * _sign(primary_diff) < 0
+    return CheckResult(check, mean, len(diffs), len(missing - by_repo.keys()), flipped)
+
+
+def _run_checks(
+    runs: Sequence[RunScorings], treatment: str, control: str, analysis: Analysis
+) -> tuple[CheckResult, ...]:
+    if not analysis.repos:
+        return ()
+    primary = {NDCG_METRIC: analysis.mean_ndcg_diff, RECALL_METRIC: analysis.mean_recall_diff}
+    return tuple(
+        _check_result(runs, (treatment, control), check, primary[check.against] or 0.0)
+        for check in CHECKS
+    )
+
+
 def _analyze(
     runs: Sequence[RunScorings], treatment: str, control: str, *, latest: bool, seed: int
 ) -> Analysis:
@@ -260,6 +335,7 @@ def build_report(
     """Aggregate `runs` into the primary analysis, plus the later-scoring sensitivity check."""
     _check_unique(runs)
     primary = _analyze(runs, treatment, control, latest=False, seed=seed)
+    primary = replace(primary, checks=_run_checks(runs, treatment, control, primary))
     later = _analyze(runs, treatment, control, latest=True, seed=seed)
     differs = any(len(_eligible_dates(run.scorings)) > 1 for run in runs)
     return Report(treatment, control, primary, later if differs else None)
@@ -289,9 +365,29 @@ def _render_analysis(analysis: Analysis, treatment: str, control: str) -> list[s
     return lines
 
 
+def _render_check(result: CheckResult) -> str:
+    if result.mean_diff is None:
+        direction = f"n/a, {result.missing} repos lack it"
+    else:
+        direction = "**flipped**" if result.flipped else "same"
+        if result.missing:
+            direction += f" ({result.missing} repos lack it)"
+    return f"| {result.check.name} | {_fmt(result.mean_diff)} | {result.repos} | {direction} |"
+
+
 def render(report: Report) -> str:
     """Render the report as Markdown. A flipped sensitivity check comes first."""
     lines = [f"# Report: {report.treatment} against {report.control}", ""]
+    flips = [c.check.name for c in report.primary.checks if c.flipped]
+    if flips:
+        names = ", ".join(flips)
+        lines += [
+            (
+                f"**Sensitivity flip:** {names} reverse the direction of the headline "
+                "(ADR 0005). They do not change the verdict."
+            ),
+            "",
+        ]
     if report.flipped and report.sensitivity is not None:
         later = report.sensitivity
         now, before = later.outcome or "no verdict", report.primary.outcome or "no verdict"
@@ -322,6 +418,13 @@ def render(report: Report) -> str:
         f"{_fmt(w.ndcg_diff)} | {_fmt(w.recall_diff)} |"
         for w in report.primary.windows
     ]
+    if report.primary.checks:
+        lines += ["", "## Sensitivity checks (report-only)", ""]
+        lines += [
+            "| Check | Mean difference | Repos | Direction |",
+            "| --- | ---: | ---: | --- |",
+        ]
+        lines += [_render_check(c) for c in report.primary.checks]
     if report.primary.left_out:
         lines += ["", "## Left out", ""]
         lines += [

@@ -230,3 +230,71 @@ def test_a_duplicate_without_scores_is_left_out_not_fatal() -> None:
     result = build_report([run("o/a", run_scores(llm=((0.6, 0.5),)), run_id="r1"), bare])
     assert [r.repo for r in result.primary.repos] == ["o/a"]
     assert [s.run_id for s in result.primary.left_out] == ["r2"]
+
+
+def with_metrics(base: float, llm: float, **extra: tuple[float, float]) -> RunScores:
+    """Build a Run where each extra metric is given as (baseline, llm)."""
+    keyed = {"ndcg@20": (base, llm), "recall@20%loc": (0.5, 0.5), **extra}
+    return RunScores(
+        labeled_files=12,
+        min_labeled_files=10,
+        excluded="",
+        rankings={
+            "baseline": Scores(metrics={k: v[0] for k, v in keyed.items()}),
+            "llm-0": Scores(metrics={k: v[1] for k, v in keyed.items()}),
+        },
+    )
+
+
+def checks_by_name(runs: list[RunScorings]) -> dict[str, report.CheckResult]:
+    return {c.check.name: c for c in build_report(runs).primary.checks}
+
+
+def test_a_check_that_reverses_the_direction_is_reported_first() -> None:
+    runs = [run(f"o/r{i}", with_metrics(0.5, 0.6, **{"ndcg@5": (0.5, 0.4)})) for i in range(5)]
+    result = build_report(runs)
+    assert result.primary.outcome is not None  # the verdict is untouched by the check
+    text = render(result)
+    assert text.splitlines()[2].startswith("**Sensitivity flip:** k = 5")
+    assert checks_by_name(runs)["k = 5"].flipped
+
+
+def test_a_check_in_the_same_direction_does_not_flip() -> None:
+    runs = [run(f"o/r{i}", with_metrics(0.5, 0.6, **{"ndcg@5": (0.5, 0.7)})) for i in range(5)]
+    assert not checks_by_name(runs)["k = 5"].flipped
+    assert "Sensitivity flip" not in render(build_report(runs))
+
+
+def test_a_check_missing_from_older_scores_is_not_computed_not_failed() -> None:
+    runs = [run(f"o/r{i}", run_scores(llm=((0.6, 0.5),))) for i in range(5)]
+    got = checks_by_name(runs)["Binary gain"]
+    assert got.mean_diff is None
+    assert got.missing == 5
+    assert not got.flipped
+    assert "n/a, 5 repos lack it" in render(build_report(runs))
+
+
+def test_complexity_effort_is_compared_with_the_recall_direction() -> None:
+    runs = [
+        run(f"o/r{i}", with_metrics(0.5, 0.6, **{"recall@20%cc": (0.5, 0.4)})) for i in range(5)
+    ]
+    # Primary recall difference is 0, so there is no direction to flip.
+    assert not checks_by_name(runs)["Cyclomatic complexity as effort"].flipped
+
+
+def test_checks_use_headline_repos_only() -> None:
+    exploratory = run("o/x", with_metrics(0.5, 0.9, **{"ndcg@5": (0.5, 0.9)}), post=False)
+    headline = [run(f"o/r{i}", with_metrics(0.5, 0.6, **{"ndcg@5": (0.5, 0.6)})) for i in range(5)]
+    got = checks_by_name([exploratory, *headline])["k = 5"]
+    assert got.repos == 5
+    assert got.mean_diff == pytest.approx(0.1)
+
+
+def test_every_check_metric_is_written_by_the_scorer() -> None:
+    from tech_debt_miner import labels  # noqa: PLC0415 - only this guard needs it
+
+    variants = {labels.variant_name(cap): {"a.py": 1} for cap in labels.CAP_GRID}
+    variants |= {name: {"a.py": 1} for name, _ in labels.WINDOW_VARIANTS}
+    full = Labels(counts={"a.py": 1}, keyword_counts={"a.py": 1}, variants=variants)
+    written = scoring.score_ranking([("a.py",)], full, {"a.py": 1}, {"a.py": 1}).metrics
+    assert {c.metric for c in report.CHECKS} <= set(written)
