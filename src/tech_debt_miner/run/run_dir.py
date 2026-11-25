@@ -7,7 +7,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self
 
-from tech_debt_miner.run import store
+from tech_debt_miner import jsonio
 from tech_debt_miner.run.artifacts import (
     BASELINE,
     LABELS,
@@ -25,7 +25,7 @@ LLM = "llm"
 
 # The heuristic-only loop (M1): nothing writes `requests.jsonl` or LLM rankings yet, so a Run is
 # planned once `snapshot.json` exists and `rank` is done with the Baseline ranking alone. The
-# LLM rank stage (#88) sets this to True, which restores the full ADR 0008 rules.
+# LLM rank stage (#89) sets this to True, which restores the full ADR 0008 rules.
 LLM_RANKING = False
 
 
@@ -58,7 +58,7 @@ def run_id(manifest: Manifest, now: datetime) -> str:
 
 
 def _manifest_text(manifest: Manifest) -> str:
-    return store.canonical_json(MANIFEST.encode(manifest))
+    return jsonio.canonical_json(MANIFEST.encode(manifest))
 
 
 class RunDir:
@@ -98,7 +98,7 @@ class RunDir:
 
     def read[T, K](self, artifact: Artifact[T, K], key: K | None = None) -> T:
         self._require(artifact, Policy.REPLACE, Policy.CREATE_ONCE, op="read")
-        return artifact.decode(store.read_json(self._path(artifact, key)))
+        return artifact.decode(jsonio.read_json(self._path(artifact, key)))
 
     def write[T, K](self, artifact: Artifact[T, K], value: T, key: K | None = None) -> None:
         """Write `value`. A `CREATE_ONCE` artifact (scores) never overwrites an earlier file."""
@@ -107,15 +107,15 @@ class RunDir:
         if artifact.policy is Policy.CREATE_ONCE and path.exists():
             msg = f"{path.name} already exists; it is never overwritten"
             raise FileExistsError(msg)
-        store.write_json(path, artifact.encode(value))
+        jsonio.write_json(path, artifact.encode(value))
 
     def append[T](self, artifact: Artifact[T, None], value: T) -> None:
         self._require(artifact, Policy.APPEND, op="append to")
-        store.append_jsonl(self._path(artifact, None), artifact.encode(value))
+        jsonio.append_jsonl(self._path(artifact, None), artifact.encode(value))
 
     def read_all[T](self, artifact: Artifact[T, None]) -> list[T]:
         self._require(artifact, Policy.APPEND, op="read all rows of")
-        return [artifact.decode(row) for row in store.read_jsonl(self._path(artifact, None))]
+        return [artifact.decode(row) for row in jsonio.read_jsonl(self._path(artifact, None))]
 
     def keys[K](self, artifact: Artifact[Any, K]) -> list[K]:
         """Return the keys of a keyed artifact's existing files, sorted."""

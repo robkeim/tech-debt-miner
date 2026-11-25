@@ -296,7 +296,29 @@ def build_variants(  # noqa: PLR0913 - one input per axis the variants vary
     for name, months in WINDOW_VARIANTS:
         if months > WINDOW_MONTHS and not later_commits:
             continue
-        end = window_end(cutoff, months)
-        within = [c for c in (*later_commits, *commits) if c.committed_at.date() <= end]
-        variants[name] = dict(build_labels(within, cutoff_files, max_files, closed_bugs).counts)
+        variants[name] = window_counts(
+            commits,
+            later_commits,
+            cutoff_files,
+            months=months,
+            max_files=max_files,
+            closed_bugs=closed_bugs,
+            cutoff=cutoff,
+        )
     return variants
+
+
+def window_counts(  # noqa: PLR0913 - one input per axis the count varies
+    commits: Sequence[CommitChange],
+    later_commits: Sequence[CommitChange],
+    cutoff_files: Collection[str],
+    *,
+    months: int,
+    max_files: int | None,
+    closed_bugs: Collection[int],
+    cutoff: date,
+) -> dict[str, int]:
+    """Tracker-confirmed counts over `(cutoff, cutoff + months]` at the cap `max_files`."""
+    end = window_end(cutoff, months)
+    within = [c for c in (*later_commits, *commits) if c.committed_at.date() <= end]
+    return dict(build_labels(within, cutoff_files, max_files, closed_bugs).counts)

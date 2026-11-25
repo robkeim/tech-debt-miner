@@ -17,5 +17,9 @@ Keeping `report` a pure function of score files preserves the rule that the same
 
 ## Known limits
 
-- The 12-month window closes six months after the 6-month one, and `label` writes once. A Run labeled as soon as the primary window closes never gets `window-12m`, and the report shows that check as n/a for it. Filling it in needs a Run labeled after the 12-month window closes.
+- The 12-month window closes six months after the 6-month one, and `label` writes once. A Run labeled as soon as the primary window closes never gets `window-12m`, and the report shows that check as n/a for it. Filling it in needs a Run labeled after the 12-month window closes, or `label-later` ([ADR 0022](0022-label-later-writes-the-12-month-window.md)).
 - Scores written before this change have none of the new keys; those checks show as n/a.
+
+## Amendments
+
+- 2026-11-25: `window-12m` can come from `labels-12m.json`, written by `label-later` and read by `score` ([ADR 0022](0022-label-later-writes-the-12-month-window.md), #135).
