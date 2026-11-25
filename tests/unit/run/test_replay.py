@@ -43,7 +43,7 @@ def parse_paths(text: str) -> tuple[str, ...]:
 
 def test_replay_scores_from_the_run_directory_alone(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    cache = ResponseCache(tmp_path / "cache")
+    cache = ResponseCache(tmp_path / "cache", {})
     client = LLMClient(
         Sequence("a.py,b.py", "b.py,a.py"),
         max_usd=1.0,
@@ -62,7 +62,7 @@ def test_replay_scores_from_the_run_directory_alone(tmp_path: Path) -> None:
 
 
 def test_cache_hits_are_copied_into_the_run_log(tmp_path: Path) -> None:
-    cache = ResponseCache(tmp_path / "cache")
+    cache = ResponseCache(tmp_path / "cache", {})
     LLMClient(Sequence("a.py"), max_usd=1.0, cache=cache).complete(REQUEST)
     run = make_run(tmp_path)
     client = LLMClient(DryRunTransport(), max_usd=1.0, cache=cache, on_response=sink(run))
@@ -83,7 +83,7 @@ def test_the_highest_attempt_wins(tmp_path: Path) -> None:
 
 def test_a_resume_that_logs_the_same_attempt_twice_collapses(tmp_path: Path) -> None:
     run = make_run(tmp_path)
-    cache = ResponseCache(tmp_path / "cache")
+    cache = ResponseCache(tmp_path / "cache", {})
     for _ in range(2):
         LLMClient(Sequence("a.py"), max_usd=1.0, cache=cache, on_response=sink(run)).complete(
             REQUEST
