@@ -153,3 +153,33 @@ def test_gh_graphql_reports_a_failed_call(monkeypatch: pytest.MonkeyPatch) -> No
 
     with pytest.raises(GitHubError, match="not logged in"):
         gh_graphql("query", {})
+
+
+def bug_page(nodes: list[tuple[int, str | None]], *, more: bool = False) -> dict[str, Any]:
+    info = {"hasNextPage": more, "endCursor": "next" if more else None}
+    rows = [
+        {"number": number, "issueType": None if kind is None else {"name": kind}}
+        for number, kind in nodes
+    ]
+    return {"data": {"repository": {"issues": {"pageInfo": info, "nodes": rows}}}}
+
+
+def test_closed_bugs_are_the_closed_issues_typed_bug_across_pages() -> None:
+    pages = [bug_page([(1, "Bug"), (2, "Feature"), (3, None)], more=True), bug_page([(4, "bug")])]
+    sent: list[Variables] = []
+
+    def graphql(query: str, variables: Variables) -> Mapping[str, Any]:
+        assert "CLOSED" in query
+        sent.append(variables)
+        return pages.pop(0)
+
+    assert github.fetch_closed_bugs("o/r", graphql) == frozenset({1, 4})
+    assert [variables["after"] for variables in sent] == [None, "next"]
+
+
+def test_closed_bugs_surface_graphql_errors() -> None:
+    def graphql(_query: str, _variables: Variables) -> Mapping[str, Any]:
+        return {"errors": [{"message": "boom"}]}
+
+    with pytest.raises(GitHubError, match="boom"):
+        github.fetch_closed_bugs("o/r", graphql)

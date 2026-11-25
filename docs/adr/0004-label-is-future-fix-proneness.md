@@ -30,3 +30,9 @@ The numeric parameters (N, exclusion globs, window length) belong to the pre-reg
   - **Percentile:** nearest rank, 90th. Fix commits touching no Eligible file are left out of it, since they never count toward a Label and would pull N down.
   - **Review sheet:** samples only Fix commits that count under N (1 to N Eligible files), so the reviewer does not see fixes the cap drops. "Linked issue" means `#N` references found in the message, not tracker-confirmed.
   - **Enforcement:** `validation.json` is create-once, and `label --max-files` must equal its N when the file exists. It is not required, so Runs without it behave as before.
+- 2026-11-25: `label` (#74) counts the primary set ([GLOSSARY.md](../../GLOSSARY.md): Label, Tracker-confirmed Fix commit). `labels.json` holds both sets: `counts` is the primary, tracker-confirmed Label that `score` reads, and `keyword_counts` is the keyword-only sensitivity set.
+  - **Linked:** the message names the issue as `#N` or a `/issues/N` URL, apart from a trailing `(#N)`. A URL is matched by its number alone, so a link to another repository's issue can match. Any linked issue that is closed and typed Bug (case-insensitive) is enough.
+  - **Same exclusions:** bots, the message words and the cap N apply to both sets. The primary set does not need a keyword.
+  - **Tracker read:** `label` reads every closed issue's type once, after the window check, so the state is that of the scoring date ([ADR 0006](0006-target-repos-and-cutoff-dates.md)). `labels.json` records `issues_read_at` and the `linked_closed_bugs` it saw, and a re-score needs a new Run.
+  - **N:** still computed from keyword fix sizes only, as before.
+
