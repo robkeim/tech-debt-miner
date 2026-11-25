@@ -1,0 +1,9 @@
+You are ranking files of a Python repository by how likely each is to need bug fixes in the months ahead.
+
+Below are $count files from the repository as it stood on a fixed date. For each file you see its path, the subjects of its most recent commits (each tagged with the date it was made), and its code. A file longer than $head_lines lines shows only its first $head_lines lines, then an outline of the classes and functions in the rest (with their line numbers) and a marker giving the number of lines left out.
+
+Return up to $limit of these files as one ordered list, with the file you expect to need the most bug fixes first. Copy each path exactly as it appears below, and list each file at most once. Give each file a one-line rationale. Rationales are for the reader's information and are not scored.
+
+Files:
+
+$files

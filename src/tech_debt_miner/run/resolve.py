@@ -5,7 +5,13 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
+from tech_debt_miner.rankers.prompts import (
+    DIGEST_MAX_SUBJECTS,
+    TRIAGE_SET_SIZE,
+    template_hashes,
+)
 from tech_debt_miner.repo import git
+from tech_debt_miner.repo.source import HEAD_LINES
 from tech_debt_miner.run.run_dir import RunDir
 from tech_debt_miner.types import Manifest
 
@@ -42,6 +48,16 @@ def clone_url(repo: str) -> str:
     return f"https://github.com/{repo}.git"
 
 
+def prompt_hashes() -> dict[str, str]:
+    """Return the template hashes and the digest and truncation parameters (ADR 0010)."""
+    return {
+        **template_hashes(),
+        "digest_max_subjects": str(DIGEST_MAX_SUBJECTS),
+        "head_lines": str(HEAD_LINES),
+        "triage_set_size": str(TRIAGE_SET_SIZE),
+    }
+
+
 def resolve(inputs: ResolveInputs, deps: ResolveDeps) -> RunDir:
     """Clone the Target repo if needed, pin the SHA, and write `manifest.json` once."""
     if inputs.repeats < 1:
@@ -56,7 +72,7 @@ def resolve(inputs: ResolveInputs, deps: ResolveDeps) -> RunDir:
         model_training_cutoff=inputs.training_cutoff.isoformat(),
         cutoff_minus_training_days=(inputs.cutoff - inputs.training_cutoff).days,
         repeats=inputs.repeats,
-        prompt_hashes={},  # empty until M2
+        prompt_hashes=prompt_hashes(),
         lizard_version=deps.lizard_version,
         adr_shas={
             adr: git.last_commit_touching(deps.tool_root, path) for adr, path in ADR_FILES.items()

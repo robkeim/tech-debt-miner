@@ -104,6 +104,10 @@ def _check_cap(run_dir: RunDir, deps: LabelDeps) -> None:
         raise CapMismatchError(msg)
 
 
+def _cap_name(cap: int | None) -> str:
+    return "uncapped" if cap is None else str(cap)
+
+
 def label(run_dir: RunDir, deps: LabelDeps, closed_bugs: ClosedBugs) -> Labels:
     """Write `labels.json` for the Run, or raise `WindowOpenError` while the window is open.
 
@@ -139,6 +143,8 @@ def label(run_dir: RunDir, deps: LabelDeps, closed_bugs: ClosedBugs) -> Labels:
         clone_head=git.head_sha(window.clone),
         clone_newest_commit=git.head_committed_at(window.clone).isoformat(),
         fetched=deps.update_clone is not None,
+        max_files=deps.max_files,
+        max_files_recorded=True,
     )
     run_dir.write(LABELS, result)
     return result
@@ -170,6 +176,13 @@ def label_later(run_dir: RunDir, deps: LabelDeps, closed_bugs: ClosedBugs) -> La
         msg = f"the 12-month window closes after {end}; today is {today}"
         raise WindowOpenError(msg)
     _check_cap(run_dir, deps)
+    primary = run_dir.read(LABELS)
+    if primary.max_files_recorded and primary.max_files != deps.max_files:
+        msg = (
+            f"--max-files must be the N in labels.json ({_cap_name(primary.max_files)}); "
+            "the 12-month counts must use the primary N"
+        )
+        raise CapMismatchError(msg)
     window = read_window(run_dir, deps)
     bugs = frozenset(closed_bugs(manifest.target_repo))
     read_at = deps.clock()
