@@ -10,7 +10,7 @@ Members of a group are stored sorted by path, only so the artifact bytes are det
 
 ## Why
 
-ADR 0005 forbids a path-name tie-break and requires averaging over tied orderings, and the Baseline produces ties. A flat ordered tuple loses them, and any reader would silently apply the stored order. Putting the groups in the artifact keeps `rankings/baseline.json` self-describing, so Replay and scoring need neither the Snapshot nor the ranker module.
+ADR 0005 forbids a path-name tie-break and requires averaging over tied orderings, and the Baseline produces ties. A flat ordered tuple loses them, and any reader would silently apply the stored order. Putting the groups in the artifact keeps `rankings/baseline.json` self-describing, so Replay and scoring can read ties from the artifact alone, without the Snapshot or the ranker module (the scorer already takes groups).
 
 ## Known limits
 
