@@ -1,6 +1,6 @@
 """The command line: `resolve`, `snapshot`, `rank`, `label`, `validate`, `probe`, `resume`.
 
-See ADR 0009.
+`status` prints a Run's state. See ADR 0009.
 """
 
 import argparse
@@ -273,7 +273,7 @@ def _resume(args: argparse.Namespace) -> int:
     except github.GitHubError as error:
         print(f"{error} (pass --no-issues to skip issues)", file=sys.stderr)
         return 1
-    except (WindowOpenError, CloneUpdateError, CapMismatchError, FileExistsError) as error:
+    except (WindowOpenError, CloneUpdateError, CapMismatchError) as error:
         print(error, file=sys.stderr)
         return 1
     print(f"ran: {', '.join(ran) or 'nothing'}; state: {run_dir.state().value}")
